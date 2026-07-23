@@ -1,0 +1,16 @@
+default:
+  provider: anthropic
+  model: claude-sonnet-5
+tasks:
+  extraction:
+    provider: google
+    model: gemini-1.5-flash
+  scoring:
+    provider: anthropic
+    model: claude-sonnet-5
+  adaptation:
+    provider: anthropic
+    model: claude-opus-4-8
+  embeddings:
+    provider: openai
+    model: text-embedding-3-small
