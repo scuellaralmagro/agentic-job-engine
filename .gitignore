@@ -1,0 +1,21 @@
+# Local design/spec docs — kept out of version control
+docs/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+*.sqlite
+*.sqlite3
+*.db
+
+# Node / frontend
+node_modules/
+dist/
+.vite/
+
+# OS / editor
+.DS_Store
+Thumbs.db
