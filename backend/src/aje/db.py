@@ -23,7 +23,11 @@ def make_engine(database_url: str) -> Engine:
 
 @lru_cache
 def get_engine() -> Engine:
-    return make_engine(get_settings().database_url)
+    settings = get_settings()
+    # sqlite cannot create its file inside a directory that does not exist yet, and
+    # startup touches the database before anything else has a reason to make it
+    settings.data_dir.mkdir(parents=True, exist_ok=True)
+    return make_engine(settings.database_url)
 
 
 def get_session() -> Session:
