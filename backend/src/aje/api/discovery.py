@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 from aje.api.profile import get_db_session
 from aje.discovery import graph as graph_mod
 from aje.discovery import manual as manual_mod
+from aje.discovery.scheduler import get_scheduler, remove_search_job, sync_search_job
 from aje.models import DiscoveryRun, Offer, SavedSearch
 
 router = APIRouter()
@@ -73,6 +74,7 @@ def create_search(
     search = SavedSearch(**body.model_dump())
     session.add(search)
     session.commit()
+    sync_search_job(get_scheduler(), search)
     return _search_out(search)
 
 
@@ -86,6 +88,7 @@ def update_search(
     for field, value in body.model_dump().items():
         setattr(search, field, value)
     session.commit()
+    sync_search_job(get_scheduler(), search)
     return _search_out(search)
 
 
@@ -96,6 +99,7 @@ def delete_search(search_id: int, session: Session = Depends(get_db_session)) ->
         raise HTTPException(status_code=404, detail="saved search not found")
     session.delete(search)
     session.commit()
+    remove_search_job(get_scheduler(), search_id)
     return {"deleted": search_id}
 
 

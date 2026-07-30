@@ -15,6 +15,15 @@ def _tmp_settings(tmp_path, monkeypatch):
     get_settings.cache_clear()
 
 
+@pytest.fixture(autouse=True)
+def _reset_scheduler():
+    from aje.discovery.scheduler import reset_scheduler
+
+    reset_scheduler()
+    yield
+    reset_scheduler()
+
+
 @pytest.fixture
 def session(tmp_path):
     engine = create_engine(f"sqlite:///{(tmp_path / 'test.sqlite3').as_posix()}")
