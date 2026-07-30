@@ -1,0 +1,17 @@
+sources:
+  adzuna:
+    enabled: true
+    country: es
+    max_results: 50
+    max_terms: 3
+  jobspy:
+    enabled: true
+    max_results: 50
+    max_terms: 2
+    country: Spain
+    sites: [linkedin, indeed, glassdoor, google]
+  tecnoempleo:
+    enabled: true
+    max_results: 50
+    max_terms: 3
+    delay_seconds: 2

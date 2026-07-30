@@ -52,6 +52,7 @@ class Offer(Base):
     source: Mapped[str] = mapped_column(String(64))
     url: Mapped[str | None] = mapped_column(String(2048), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), unique=True)
+    posted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -91,3 +92,17 @@ class GeneratedDoc(Base):
     )
     pdf_ref: Mapped[str] = mapped_column(String(1024))
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class DiscoveryRun(Base):
+    __tablename__ = "discovery_runs"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    saved_search_id: Mapped[int | None] = mapped_column(
+        ForeignKey("saved_searches.id"), nullable=True
+    )
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String(16))  # "ok" | "partial" | "failed"
+    offers_found: Mapped[int] = mapped_column(Integer, default=0)
+    offers_new: Mapped[int] = mapped_column(Integer, default=0)
+    source_results: Mapped[list] = mapped_column(JSON, default=list)
