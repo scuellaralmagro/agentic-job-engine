@@ -13,6 +13,10 @@ class Settings(BaseSettings):
     data_dir: Path = Path("./data")
     database_url: str | None = None
     models_config_path: Path = Path("./config/models.yaml")
+    sources_config_path: Path = Path("./config/sources.yaml")
+
+    adzuna_app_id: str | None = None
+    adzuna_app_key: str | None = None
 
     anthropic_api_key: str | None = None
     openai_api_key: str | None = None

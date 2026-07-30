@@ -5,6 +5,9 @@ tasks:
   extraction:
     provider: google
     model: gemini-1.5-flash
+  discovery:
+    provider: google
+    model: gemini-1.5-flash
   scoring:
     provider: anthropic
     model: claude-sonnet-5
