@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 from sqlalchemy import text
 
+from aje.api.discovery import router as discovery_router
 from aje.api.profile import router as profile_router
 from aje.db import get_engine, vec_version
 from aje.llm.providers import register_default_providers
@@ -10,6 +11,7 @@ def create_app() -> FastAPI:
     app = FastAPI(title="Agentic Job Engine")
     register_default_providers()
     app.include_router(profile_router)
+    app.include_router(discovery_router)
 
     @app.get("/health")
     def health() -> dict:
