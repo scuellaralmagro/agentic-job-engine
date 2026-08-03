@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from sqlalchemy import text
 
+from aje.api.adaptation import router as adaptation_router
 from aje.api.discovery import router as discovery_router
 from aje.api.profile import router as profile_router
 from aje.api.scoring import router as scoring_router
@@ -32,6 +33,7 @@ def create_app() -> FastAPI:
     app.include_router(profile_router)
     app.include_router(discovery_router)
     app.include_router(scoring_router)
+    app.include_router(adaptation_router)
 
     @app.get("/health")
     def health() -> dict:
