@@ -1,0 +1,9 @@
+template: cv_default
+default_language: es
+
+page:
+  format: A4
+  margin_mm: 15
+
+# Prompt guidance, not a validation rule.
+max_bullets_per_experience: 5
