@@ -1,6 +1,7 @@
 import struct
 
 from sqlalchemy import delete, select
+from sqlalchemy import text as sql_text
 from sqlalchemy.orm import Session
 
 from aje.extraction.profile_service import PROFILE_ID, get_profile
@@ -85,6 +86,33 @@ def ensure_offer_embeddings(
     items = offer_item_texts(offer, chunk_chars)
     _, vectors = _sync(session, OFFER, offer.id, items)
     return [vectors[key] for key, _ in items if key in vectors]
+
+
+def similar_profile_items(
+    session: Session, vector: list[float], limit: int
+) -> list[tuple[str, float]]:
+    """Profile items closest to `vector`, best first, as (item_key, similarity).
+
+    Brute-force scan with sqlite-vec's distance function — at this scale that is
+    faster than maintaining an index, and it keeps migrations free of vec0
+    virtual tables. Rows whose dim differs (a provider or model change) are
+    ignored rather than compared against.
+    """
+    rows = session.execute(
+        sql_text(
+            "SELECT item_key, vec_distance_cosine(vector, :q) AS dist "
+            "FROM embeddings "
+            "WHERE owner_kind = :kind AND dim = :dim "
+            "ORDER BY dist LIMIT :limit"
+        ),
+        {
+            "q": pack_vector(vector),
+            "kind": PROFILE_ITEM,
+            "dim": len(vector),
+            "limit": limit,
+        },
+    ).all()
+    return [(item_key, 1.0 - dist) for item_key, dist in rows]
 
 
 def rebuild_all_embeddings(session: Session) -> int:
