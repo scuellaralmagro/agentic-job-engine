@@ -2,6 +2,12 @@
 
 `build_view` is pure. The HTML and PDF layers arrive in the next two tasks.
 """
+from functools import lru_cache
+from pathlib import Path
+
+from jinja2 import Environment, FileSystemLoader, select_autoescape
+
+from aje.adaptation.config import CvConfig
 from aje.adaptation.schema import CvView, TailoredCv, ViewExperience
 from aje.adaptation.validate import AnchorError
 from aje.extraction.schema import ProfileData
@@ -12,6 +18,23 @@ from aje.keys import (
     language_key,
     skill_key,
 )
+
+_TEMPLATE_DIR = Path(__file__).parent / "templates"
+
+
+@lru_cache
+def _env() -> Environment:
+    return Environment(
+        loader=FileSystemLoader(_TEMPLATE_DIR),
+        autoescape=select_autoescape(["html", "j2"]),
+        trim_blocks=True,
+        lstrip_blocks=True,
+    )
+
+
+def render_html(view: CvView, config: CvConfig, template: str | None = None) -> str:
+    name = template or config.template
+    return _env().get_template(f"{name}.html.j2").render(cv=view, page=config.page)
 
 
 def _resolve(keys: list[str], lookup: dict[str, str]) -> list[str]:
