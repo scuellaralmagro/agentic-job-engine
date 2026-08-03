@@ -4,10 +4,11 @@
 """
 from functools import lru_cache
 from pathlib import Path
+from typing import Callable
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
-from aje.adaptation.config import CvConfig
+from aje.adaptation.config import CvConfig, PageSettings
 from aje.adaptation.schema import CvView, TailoredCv, ViewExperience
 from aje.adaptation.validate import AnchorError
 from aje.extraction.schema import ProfileData
@@ -91,3 +92,50 @@ def build_view(cv: TailoredCv, profile: ProfileData) -> CvView:
         education=_resolve(cv.education_keys, education),
         languages=_resolve(cv.language_keys, languages),
     )
+
+
+DEFAULT_ENGINE = "chromium"
+_PDF_ENGINES: dict[str, Callable[[str, PageSettings], bytes]] = {}
+
+
+class PdfEngineError(RuntimeError):
+    """The PDF could not be produced. The draft is untouched; retry the render."""
+
+
+def register_pdf_engine(name: str, fn: Callable[[str, PageSettings], bytes]) -> None:
+    _PDF_ENGINES[name] = fn
+
+
+def html_to_pdf(html: str, page: PageSettings, engine: str | None = None) -> bytes:
+    name = engine or DEFAULT_ENGINE
+    try:
+        render = _PDF_ENGINES[name]
+    except KeyError as exc:
+        raise PdfEngineError(f"unknown pdf engine: {name}") from exc
+    return render(html, page)
+
+
+def _chromium_engine(html: str, page: PageSettings) -> bytes:
+    try:
+        from playwright.sync_api import sync_playwright
+    except ImportError as exc:  # pragma: no cover - dependency is declared
+        raise PdfEngineError("playwright is not installed; run: uv sync") from exc
+
+    try:
+        with sync_playwright() as playwright:
+            browser = playwright.chromium.launch()
+            try:
+                tab = browser.new_page()
+                tab.set_content(html, wait_until="load")
+                # margins come from the template's @page rule, not from here
+                return tab.pdf(print_background=True, prefer_css_page_size=True)
+            finally:
+                browser.close()
+    except Exception as exc:  # noqa: BLE001 - every failure here is a render failure
+        raise PdfEngineError(
+            f"Chromium PDF rendering failed: {exc}. "
+            "If the browser is missing, run: uv run playwright install chromium"
+        ) from exc
+
+
+register_pdf_engine("chromium", _chromium_engine)
