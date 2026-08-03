@@ -10,7 +10,7 @@ from aje.adaptation.cover_letter import write_cover_letter
 from aje.adaptation.graph import adapt_match
 from aje.adaptation.persist import render_cover_letter, render_projection
 from aje.adaptation.render import PdfEngineError
-from aje.adaptation.schema import TailoredCv
+from aje.adaptation.schema import CoverLetterContent, TailoredCv
 from aje.adaptation.validate import AnchorError
 from aje.api.profile import get_db_session
 from aje.models import CoverLetter, CvProjection, GeneratedDoc
@@ -187,6 +187,40 @@ def create_cover_letter(
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(status_code=502, detail=f"Cover letter failed: {exc}")
+    return _letter_out(letter)
+
+
+class CoverLetterUpdate(BaseModel):
+    content_json: CoverLetterContent | None = None
+
+
+@router.get("/cover-letters")
+def list_cover_letters(
+    match_id: int | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    session: Session = Depends(get_db_session),
+) -> list[dict]:
+    stmt = select(CoverLetter).order_by(CoverLetter.created_at.desc())
+    if match_id is not None:
+        stmt = stmt.where(CoverLetter.match_id == match_id)
+    stmt = stmt.limit(limit).offset(offset)
+    return [_letter_out(letter) for letter in session.execute(stmt).scalars()]
+
+
+@router.patch("/cover-letters/{letter_id}")
+def update_cover_letter(
+    letter_id: int,
+    body: CoverLetterUpdate,
+    session: Session = Depends(get_db_session),
+) -> dict:
+    letter = session.get(CoverLetter, letter_id)
+    if letter is None:
+        raise HTTPException(status_code=404, detail="cover letter not found")
+    if body.content_json is not None:
+        letter.content_json = body.content_json.model_dump()
+        letter.language = body.content_json.language
+    session.commit()
     return _letter_out(letter)
 
 

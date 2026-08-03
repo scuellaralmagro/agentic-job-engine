@@ -241,3 +241,47 @@ def test_generated_docs_lists_newest_first_and_filters_by_kind(session):
     only_cv = client.get("/generated-docs", params={"kind": "cv"}).json()
     assert [d["kind"] for d in only_cv] == ["cv"]
     assert only_cv[0]["pdf_ref"] == "a.pdf"
+
+
+def _letter(session, *, match_id=None):
+    letter = CoverLetter(
+        match_id=match_id,
+        language="en",
+        content_json={
+            "language": "en",
+            "salutation": "Dear team,",
+            "paragraphs": ["I am a fit."],
+            "closing": "Regards",
+        },
+    )
+    session.add(letter)
+    session.commit()
+    return letter
+
+
+def test_cover_letters_list_filters_by_match(session):
+    _letter(session, match_id=None)
+    kept = _letter(session, match_id=1)
+
+    body = _client(session).get("/cover-letters", params={"match_id": 1}).json()
+
+    assert [row["id"] for row in body] == [kept.id]
+
+
+def test_cover_letter_patch_updates_content_and_language(session):
+    letter = _letter(session)
+
+    body = _client(session).patch(
+        f"/cover-letters/{letter.id}",
+        json={
+            "content_json": {
+                "language": "es",
+                "salutation": "Estimado equipo,",
+                "paragraphs": ["Encajo bien."],
+                "closing": "Saludos",
+            }
+        },
+    ).json()
+
+    assert body["content_json"]["salutation"] == "Estimado equipo,"
+    assert body["language"] == "es"
