@@ -26,6 +26,8 @@ const match: MatchOut = {
     skills: { score: 90, evidence: "Python, FastAPI" },
     seniority: { score: 70, evidence: "5 years" },
   },
+  dealbreaker: false,
+  dealbreaker_reason: null,
   gaps: [{ requirement: "Kubernetes", severity: "minor" }],
   explanation: "Strong overlap on core stack.",
   above_threshold: true,

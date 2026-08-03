@@ -127,3 +127,38 @@ def test_reset_returns_match_to_queue(session):
 
     assert client.post(f"/matches/{match.id}/reset").json()["status"] == "new"
     assert len(client.get("/queue").json()) == 1
+
+
+def test_match_rubric_exposes_only_scored_dimensions(session):
+    """The stored rubric also carries the dealbreaker flag and its reason; leaking
+    those into `rubric` makes the field a mixed bag consumers cannot iterate."""
+    match = _match(session, title="A", fitness=70.0, h="rb1")
+    match.rubric = {
+        "skills": {"score": 93, "evidence": "JavaScript"},
+        "seniority": {"score": 62, "evidence": "3 years"},
+        "dealbreaker": False,
+        "dealbreaker_reason": None,
+    }
+    session.commit()
+
+    body = _client(session).get(f"/matches/{match.id}").json()
+
+    assert set(body["rubric"]) == {"skills", "seniority"}
+    assert all("score" in v for v in body["rubric"].values())
+    assert body["dealbreaker"] is False
+    assert body["dealbreaker_reason"] is None
+
+
+def test_a_dealbreaker_is_surfaced_rather_than_dropped(session):
+    match = _match(session, title="B", fitness=20.0, h="rb2")
+    match.rubric = {
+        "skills": {"score": 10, "evidence": "none"},
+        "dealbreaker": True,
+        "dealbreaker_reason": "Requires a work permit the candidate lacks",
+    }
+    session.commit()
+
+    body = _client(session).get(f"/matches/{match.id}").json()
+
+    assert body["dealbreaker"] is True
+    assert "work permit" in body["dealbreaker_reason"]

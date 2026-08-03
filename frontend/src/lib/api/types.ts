@@ -30,7 +30,11 @@ export interface MatchOut {
   offer_id: number;
   offer: OfferOut | null;
   fitness: number;
+  /** Scored dimensions only — the API splits the dealbreaker flag out, so every
+   *  value here is guaranteed to carry a score. */
   rubric: Record<string, RubricCriterion>;
+  dealbreaker: boolean;
+  dealbreaker_reason: string | null;
   gaps: Gap[];
   explanation: string | null;
   above_threshold: boolean;

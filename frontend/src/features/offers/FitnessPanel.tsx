@@ -1,7 +1,7 @@
 import { GlassPanel } from "@/components/GlassPanel";
 import { fitnessLevel } from "@/lib/fitness";
 import { cn } from "@/lib/utils";
-import type { MatchOut } from "@/lib/api/types";
+import type { MatchOut, RubricCriterion } from "@/lib/api/types";
 
 const dialColor = {
   high: "stroke-ok",
@@ -49,11 +49,30 @@ function Dial({ fitness }: { fitness: number }) {
 }
 
 export function FitnessPanel({ match }: { match: MatchOut }) {
+  // Belt and braces: the API filters the rubric down to scored dimensions, but a
+  // stored rubric also holds the dealbreaker flag and a null reason, and reading
+  // .score off those took down the whole route.
+  const dimensions = Object.entries(match.rubric ?? {}).filter(
+    (entry): entry is [string, RubricCriterion] =>
+      typeof entry[1] === "object" &&
+      entry[1] !== null &&
+      typeof (entry[1] as RubricCriterion).score === "number",
+  );
+
   return (
     <GlassPanel className="space-y-5">
       <Dial fitness={match.fitness} />
+      {match.dealbreaker && (
+        <div className="rounded-xl border border-danger/40 bg-danger/10 p-3 text-sm">
+          <p className="font-medium text-danger">Dealbreaker</p>
+          <p className="text-ink-dim">
+            {match.dealbreaker_reason ??
+              "A hard blocker was found that the candidate cannot resolve."}
+          </p>
+        </div>
+      )}
       <div className="space-y-3">
-        {Object.entries(match.rubric).map(([name, crit]) => (
+        {dimensions.map(([name, crit]) => (
           <div key={name}>
             <div className="mb-1 flex justify-between text-sm">
               <span className="capitalize">{name}</span>

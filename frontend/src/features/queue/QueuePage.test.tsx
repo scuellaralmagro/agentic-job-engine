@@ -25,6 +25,8 @@ function makeMatch(overrides: Partial<MatchOut> = {}): MatchOut {
     },
     fitness: 88,
     rubric: {},
+    dealbreaker: false,
+    dealbreaker_reason: null,
     gaps: [{ requirement: "Kubernetes", severity: "minor" }],
     explanation: null,
     above_threshold: true,

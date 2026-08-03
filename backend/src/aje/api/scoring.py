@@ -37,13 +37,29 @@ def _offer_out(offer: Offer | None) -> dict | None:
     }
 
 
+def _scored_dimensions(rubric: dict | None) -> dict:
+    """The stored rubric mixes scored dimensions with the dealbreaker flag and its
+    reason. Consumers iterate `rubric` expecting every value to carry a score, so
+    the non-dimension entries are split out rather than left to blow up a caller.
+    Shape-based, not a hardcoded name list, so a new dimension needs no change here.
+    """
+    return {
+        key: value
+        for key, value in (rubric or {}).items()
+        if isinstance(value, dict) and "score" in value
+    }
+
+
 def _match_out(session: Session, match: Match) -> dict:
+    rubric = match.rubric or {}
     return {
         "id": match.id,
         "offer_id": match.offer_id,
         "offer": _offer_out(session.get(Offer, match.offer_id)),
         "fitness": match.fitness,
-        "rubric": match.rubric,
+        "rubric": _scored_dimensions(rubric),
+        "dealbreaker": bool(rubric.get("dealbreaker", False)),
+        "dealbreaker_reason": rubric.get("dealbreaker_reason"),
         "gaps": match.gaps,
         "explanation": match.explanation,
         "above_threshold": match.above_threshold,
