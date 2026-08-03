@@ -33,10 +33,17 @@ class QueueSettings(BaseModel):
     threshold: float = 60.0
 
 
+class EstimateSettings(BaseModel):
+    """Rubric cost per offer. Lives in config because it changes with the model."""
+
+    cost_per_offer_usd: float = 0.011
+
+
 class ScoringConfig(BaseModel):
     weights: Weights = Field(default_factory=Weights)
     prefilter: PrefilterSettings = Field(default_factory=PrefilterSettings)
     queue: QueueSettings = Field(default_factory=QueueSettings)
+    estimate: EstimateSettings = Field(default_factory=EstimateSettings)
 
 
 def load_scoring_config(path: Path) -> ScoringConfig:

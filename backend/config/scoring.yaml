@@ -14,3 +14,7 @@ prefilter:
 
 queue:
   threshold: 60
+
+estimate:
+  # gpt-5.6-terra rubric call: ~2.7k input + ~500 output
+  cost_per_offer_usd: 0.011
