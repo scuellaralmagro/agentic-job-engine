@@ -54,6 +54,17 @@ class CvProjection(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
+class CoverLetter(Base):
+    __tablename__ = "cover_letters"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
+    offer_id: Mapped[int | None] = mapped_column(ForeignKey("offers.id"), nullable=True)
+    profile_id: Mapped[int | None] = mapped_column(ForeignKey("profile.id"), nullable=True)
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    content_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
 class Offer(Base):
     __tablename__ = "offers"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)

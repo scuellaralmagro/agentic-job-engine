@@ -9,9 +9,9 @@ from typing import Callable
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 
 from aje.adaptation.config import CvConfig, PageSettings
-from aje.adaptation.schema import CvView, TailoredCv, ViewExperience
+from aje.adaptation.schema import CoverLetterContent, CvView, TailoredCv, ViewExperience
 from aje.adaptation.validate import AnchorError
-from aje.extraction.schema import ProfileData
+from aje.extraction.schema import Contact, ProfileData
 from aje.keys import (
     achievement_key,
     education_key,
@@ -36,6 +36,18 @@ def _env() -> Environment:
 def render_html(view: CvView, config: CvConfig, template: str | None = None) -> str:
     name = template or config.template
     return _env().get_template(f"{name}.html.j2").render(cv=view, page=config.page)
+
+
+def render_letter_html(
+    letter: CoverLetterContent,
+    contact: Contact,
+    offer_line: str,
+    config: CvConfig,
+) -> str:
+    template = _env().get_template("cover_letter_default.html.j2")
+    return template.render(
+        letter=letter, contact=contact, offer_line=offer_line, page=config.page
+    )
 
 
 def _resolve(keys: list[str], lookup: dict[str, str]) -> list[str]:

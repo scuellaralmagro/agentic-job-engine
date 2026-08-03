@@ -3,11 +3,16 @@ from datetime import datetime
 from sqlalchemy.orm import Session
 
 from aje.adaptation.config import CvConfig, get_cv_config
-from aje.adaptation.render import build_view, html_to_pdf, render_html
-from aje.adaptation.schema import AdaptationResult, TailoredCv
+from aje.adaptation.render import (
+    build_view,
+    html_to_pdf,
+    render_html,
+    render_letter_html,
+)
+from aje.adaptation.schema import AdaptationResult, CoverLetterContent, TailoredCv
 from aje.config import get_settings
 from aje.extraction.profile_service import get_profile
-from aje.models import CvProjection, GeneratedDoc, Match, Offer
+from aje.models import CoverLetter, CvProjection, GeneratedDoc, Match, Offer
 
 
 def projection_name(offer: Offer | None) -> str:
@@ -81,4 +86,29 @@ def render_projection(
         cv_projection_id=projection.id,
         pdf_bytes=pdf_bytes,
         stem=f"cv-{projection.id}",
+    )
+
+
+def render_cover_letter(
+    session: Session, letter_id: int, *, config: CvConfig | None = None
+) -> GeneratedDoc:
+    letter = session.get(CoverLetter, letter_id)
+    if letter is None:
+        raise ValueError(f"cover letter {letter_id} not found")
+    config = config or get_cv_config()
+
+    offer = session.get(Offer, letter.offer_id) if letter.offer_id else None
+    offer_line = (
+        " - ".join(p for p in (offer.title, offer.company) if p) if offer else ""
+    )
+    content = CoverLetterContent.model_validate(letter.content_json)
+    html = render_letter_html(content, get_profile(session).contact, offer_line, config)
+
+    return save_generated_doc(
+        session,
+        kind="cover_letter",
+        offer_id=letter.offer_id,
+        cv_projection_id=None,
+        pdf_bytes=html_to_pdf(html, config.page),
+        stem=f"cover-letter-{letter.id}",
     )

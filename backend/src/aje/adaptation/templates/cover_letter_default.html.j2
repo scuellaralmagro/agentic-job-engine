@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="{{ letter.language }}">
+<head>
+<meta charset="utf-8">
+<title>Cover letter</title>
+<style>
+  @page { size: {{ page.format }}; margin: {{ page.margin_mm }}mm; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+         font-size: 11pt; line-height: 1.55; color: #1f2328; margin: 0; }
+  @media screen { body { padding: {{ page.margin_mm }}mm; } }
+  header { margin-bottom: 26px; }
+  h1 { font-size: 15pt; margin: 0; }
+  .contact { font-size: 9pt; color: #57606a; margin-top: 3px; }
+  .to { color: #57606a; font-size: 10pt; margin-bottom: 20px; }
+  p { margin: 0 0 12px; }
+  .closing { margin-top: 22px; white-space: pre-line; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>{{ contact.full_name or "" }}</h1>
+    <div class="contact">
+      {{ [contact.email, contact.phone, contact.location] | select | join(" · ") }}
+    </div>
+  </header>
+
+  {% if offer_line %}
+  <div class="to">{{ offer_line }}</div>
+  {% endif %}
+
+  <p>{{ letter.salutation }}</p>
+  {% for paragraph in letter.paragraphs %}
+  <p>{{ paragraph }}</p>
+  {% endfor %}
+  <div class="closing">{{ letter.closing }}</div>
+</body>
+</html>

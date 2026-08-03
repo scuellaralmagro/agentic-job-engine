@@ -22,3 +22,4 @@ def test_upgrade_head_builds_schema(tmp_path, monkeypatch):
     assert "contact" in profile_cols
     projection_cols = {c["name"] for c in inspect(engine).get_columns("cv_projections")}
     assert {"match_id", "suggestions", "language"} <= projection_cols
+    assert "cover_letters" in tables

@@ -6,13 +6,14 @@ from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from aje.adaptation.cover_letter import write_cover_letter
 from aje.adaptation.graph import adapt_match
-from aje.adaptation.persist import render_projection
+from aje.adaptation.persist import render_cover_letter, render_projection
 from aje.adaptation.render import PdfEngineError
 from aje.adaptation.schema import TailoredCv
 from aje.adaptation.validate import AnchorError
 from aje.api.profile import get_db_session
-from aje.models import CvProjection, GeneratedDoc
+from aje.models import CoverLetter, CvProjection, GeneratedDoc
 
 router = APIRouter()
 
@@ -145,3 +146,50 @@ def download(doc_id: int, session: Session = Depends(get_db_session)) -> FileRes
     if not path.exists():
         raise HTTPException(status_code=404, detail="document file is missing")
     return FileResponse(path, media_type="application/pdf", filename=path.name)
+
+
+def _letter_out(letter: CoverLetter) -> dict:
+    return {
+        "id": letter.id,
+        "match_id": letter.match_id,
+        "offer_id": letter.offer_id,
+        "language": letter.language,
+        "content_json": letter.content_json,
+        "created_at": letter.created_at.isoformat(),
+    }
+
+
+@router.post("/matches/{match_id}/cover-letter")
+def create_cover_letter(
+    match_id: int, body: AdaptIn, session: Session = Depends(get_db_session)
+) -> dict:
+    try:
+        letter = write_cover_letter(
+            session, match_id, language=body.language, notes=body.notes
+        )
+    except AnchorError as exc:
+        raise HTTPException(status_code=422, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(status_code=502, detail=f"Cover letter failed: {exc}")
+    return _letter_out(letter)
+
+
+@router.get("/cover-letters/{letter_id}")
+def read_cover_letter(letter_id: int, session: Session = Depends(get_db_session)) -> dict:
+    letter = session.get(CoverLetter, letter_id)
+    if letter is None:
+        raise HTTPException(status_code=404, detail="cover letter not found")
+    return _letter_out(letter)
+
+
+@router.post("/cover-letters/{letter_id}/render")
+def render_letter(letter_id: int, session: Session = Depends(get_db_session)) -> dict:
+    try:
+        doc = render_cover_letter(session, letter_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except PdfEngineError as exc:
+        raise HTTPException(status_code=502, detail=str(exc))
+    return _doc_out(doc)
