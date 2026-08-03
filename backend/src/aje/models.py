@@ -132,12 +132,39 @@ class DiscoveryRun(Base):
     saved_search_id: Mapped[int | None] = mapped_column(
         ForeignKey("saved_searches.id"), nullable=True
     )
+    kind: Mapped[str] = mapped_column(String(16), default="manual")  # scheduled|manual
+    term: Mapped[str | None] = mapped_column(Text, nullable=True)
+    filters: Mapped[dict] = mapped_column(JSON, default=dict)
     started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     finished_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     status: Mapped[str] = mapped_column(String(16))  # "ok" | "partial" | "failed"
     offers_found: Mapped[int] = mapped_column(Integer, default=0)
     offers_new: Mapped[int] = mapped_column(Integer, default=0)
     source_results: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class DiscoveryResult(Base):
+    """One offer as returned by one run.
+
+    Re-finds are recorded too — a search that surfaces nothing new still returned
+    something, and the history has to say so rather than reporting zero.
+    """
+
+    __tablename__ = "discovery_results"
+    __table_args__ = (
+        UniqueConstraint("run_id", "offer_id", name="uq_discovery_results_run_offer"),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    run_id: Mapped[int] = mapped_column(ForeignKey("discovery_runs.id"))
+    offer_id: Mapped[int] = mapped_column(ForeignKey("offers.id"))
+    is_new: Mapped[bool] = mapped_column(default=True)
+    # discovered | scoring | prefiltered | scored | failed
+    status: Mapped[str] = mapped_column(String(16), default="discovered")
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, default=datetime.utcnow, onupdate=datetime.utcnow
+    )
 
 
 class Embedding(Base):

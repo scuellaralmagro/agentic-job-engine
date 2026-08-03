@@ -49,3 +49,47 @@ def test_discovery_run_stores_source_results(session):
     got = session.query(DiscoveryRun).one()
     assert got.source_results[0]["source"] == "adzuna"
     assert got.status == "partial"
+
+
+def test_discovery_result_links_a_run_to_an_offer(session):
+    from aje.models import DiscoveryResult
+
+    offer = Offer(title="Backend Engineer", source="test", content_hash="dr1", skills=[])
+    run = DiscoveryRun(status="running", kind="manual", term="python", filters={})
+    session.add_all([offer, run])
+    session.commit()
+
+    session.add(
+        DiscoveryResult(
+            run_id=run.id, offer_id=offer.id, is_new=True, status="discovered"
+        )
+    )
+    session.commit()
+
+    row = session.query(DiscoveryResult).one()
+    assert row.run_id == run.id and row.offer_id == offer.id
+    assert row.is_new is True and row.status == "discovered"
+    assert row.error is None
+
+
+def test_a_run_reports_an_offer_only_once(session):
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    from aje.models import DiscoveryResult
+
+    offer = Offer(title="A", source="test", content_hash="dr2", skills=[])
+    run = DiscoveryRun(status="running", kind="manual", term="go", filters={})
+    session.add_all([offer, run])
+    session.commit()
+
+    session.add(
+        DiscoveryResult(run_id=run.id, offer_id=offer.id, is_new=True, status="discovered")
+    )
+    session.commit()
+    session.add(
+        DiscoveryResult(run_id=run.id, offer_id=offer.id, is_new=False, status="scored")
+    )
+
+    with pytest.raises(IntegrityError):
+        session.commit()
