@@ -122,3 +122,25 @@ def test_import_offer_endpoint(session, monkeypatch):
 def test_import_offer_without_text_or_url_returns_400(session):
     resp = _client(session).post("/offers/import", json={})
     assert resp.status_code == 400
+
+
+def test_offers_list_includes_description_seniority_and_skills(session):
+    session.add(
+        Offer(
+            title="Data Engineer",
+            company="Acme",
+            source="test",
+            content_hash="offer-desc-1",
+            skills=["python", "sql"],
+            seniority="senior",
+            description="Full description here.",
+        )
+    )
+    session.commit()
+
+    body = _client(session).get("/offers").json()
+
+    row = next(o for o in body if o["title"] == "Data Engineer")
+    assert row["description"] == "Full description here."
+    assert row["seniority"] == "senior"
+    assert row["skills"] == ["python", "sql"]

@@ -104,3 +104,15 @@ def test_embeddings_rebuild_reports_how_many_were_rebuilt(session, monkeypatch):
     monkeypatch.setattr(scoring_api, "rebuild_all_embeddings", lambda sess: 4)
 
     assert _client(session).post("/embeddings/rebuild").json() == {"embedded": 4}
+
+
+def test_queue_offer_payload_includes_description_and_created_at(session):
+    match = _match(session, title="A", fitness=70.0, h="h1")
+    offer = session.get(Offer, match.offer_id)
+    offer.description = "We need a Python engineer."
+    session.commit()
+
+    body = _client(session).get("/queue").json()
+
+    assert body[0]["offer"]["description"] == "We need a Python engineer."
+    assert body[0]["offer"]["created_at"] is not None

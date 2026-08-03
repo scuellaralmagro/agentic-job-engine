@@ -29,9 +29,11 @@ def _offer_out(offer: Offer | None) -> dict | None:
         "location": offer.location,
         "seniority": offer.seniority,
         "skills": offer.skills,
+        "description": offer.description,
         "url": offer.url,
         "source": offer.source,
         "posted_at": offer.posted_at.isoformat() if offer.posted_at else None,
+        "created_at": offer.created_at.isoformat(),
     }
 
 
