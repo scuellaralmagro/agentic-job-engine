@@ -1,8 +1,18 @@
+import { useEffect, useState } from "react";
 import { User } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
 import { GlassPanel } from "@/components/GlassPanel";
-import { useProfile } from "./queries";
+import type { ProfileData } from "@/lib/api/types";
+import {
+  AchievementsEditor,
+  EducationEditor,
+  ExperiencesEditor,
+  LanguagesEditor,
+  SkillsEditor,
+} from "./editors";
+import { useProfile, useSaveProfile } from "./queries";
 
 export function Provenance({ refs }: { refs: number[] }) {
   if (refs.length === 0)
@@ -20,6 +30,12 @@ export function Provenance({ refs }: { refs: number[] }) {
 
 export function ProfilePage() {
   const { data: profile, isPending, isError } = useProfile();
+  const save = useSaveProfile();
+  const [draft, setDraft] = useState<ProfileData | null>(null);
+
+  useEffect(() => {
+    if (profile && draft === null) setDraft(profile);
+  }, [profile, draft]);
 
   if (isPending) return <p className="text-ink-dim">Loading…</p>;
   if (isError || !profile)
@@ -28,13 +44,15 @@ export function ProfilePage() {
         <EmptyState icon={User} title="Couldn't load the profile" />
       </GlassPanel>
     );
+  if (!draft) return <p className="text-ink-dim">Loading…</p>;
 
+  const dirty = JSON.stringify(draft) !== JSON.stringify(profile);
   const totals = [
-    ["Skills", profile.skills.length],
-    ["Experiences", profile.experiences.length],
-    ["Education", profile.education.length],
-    ["Achievements", profile.achievements.length],
-    ["Languages", profile.languages.length],
+    ["Skills", draft.skills.length],
+    ["Experiences", draft.experiences.length],
+    ["Education", draft.education.length],
+    ["Achievements", draft.achievements.length],
+    ["Languages", draft.languages.length],
   ] as const;
 
   return (
@@ -64,75 +82,55 @@ export function ProfilePage() {
 
       <GlassPanel>
         <h2 className="mb-2 font-medium">Skills</h2>
-        <div className="flex flex-wrap gap-1.5">
-          {profile.skills.map((s) => (
-            <span
-              key={s.name}
-              className="flex items-center gap-1 rounded-lg bg-surface px-2 py-1 text-sm"
-            >
-              {s.name}
-              <Provenance refs={s.source_refs} />
-            </span>
-          ))}
-        </div>
+        <SkillsEditor
+          skills={draft.skills}
+          onChange={(skills) => setDraft({ ...draft, skills })}
+        />
       </GlassPanel>
 
       <GlassPanel>
         <h2 className="mb-2 font-medium">Experience</h2>
-        <ul className="space-y-3">
-          {profile.experiences.map((exp) => (
-            <li
-              key={`${exp.company}-${exp.title}`}
-              className="rounded-xl bg-surface p-3"
-            >
-              <div className="flex items-center gap-2">
-                <p className="mr-auto font-medium">
-                  {exp.title} · {exp.company}
-                </p>
-                <span className="text-xs text-ink-dim">
-                  {exp.start ?? "?"} – {exp.end ?? "now"}
-                </span>
-                <Provenance refs={exp.source_refs} />
-              </div>
-              <ul className="mt-1 list-inside list-disc text-sm text-ink-dim">
-                {exp.bullets.map((b) => (
-                  <li key={b}>{b}</li>
-                ))}
-              </ul>
-            </li>
-          ))}
-        </ul>
+        <ExperiencesEditor
+          experiences={draft.experiences}
+          onChange={(experiences) => setDraft({ ...draft, experiences })}
+        />
       </GlassPanel>
 
-      <GlassPanel>
-        <h2 className="mb-2 font-medium">
-          Education, achievements &amp; languages
-        </h2>
-        <ul className="space-y-1 text-sm">
-          {profile.education.map((e) => (
-            <li key={e.institution} className="flex items-center gap-2">
-              <span className="mr-auto">
-                {e.institution} {e.degree && `— ${e.degree}`}
-              </span>
-              <Provenance refs={e.source_refs} />
-            </li>
-          ))}
-          {profile.achievements.map((a) => (
-            <li key={a.text} className="flex items-center gap-2">
-              <span className="mr-auto">{a.text}</span>
-              <Provenance refs={a.source_refs} />
-            </li>
-          ))}
-          {profile.languages.map((l) => (
-            <li key={l.name} className="flex items-center gap-2">
-              <span className="mr-auto">
-                {l.name} {l.level && `(${l.level})`}
-              </span>
-              <Provenance refs={l.source_refs} />
-            </li>
-          ))}
-        </ul>
-      </GlassPanel>
+      <div className="grid gap-5 lg:grid-cols-3">
+        <GlassPanel>
+          <h2 className="mb-2 font-medium">Education</h2>
+          <EducationEditor
+            items={draft.education}
+            onChange={(education) => setDraft({ ...draft, education })}
+          />
+        </GlassPanel>
+        <GlassPanel>
+          <h2 className="mb-2 font-medium">Achievements</h2>
+          <AchievementsEditor
+            items={draft.achievements}
+            onChange={(achievements) => setDraft({ ...draft, achievements })}
+          />
+        </GlassPanel>
+        <GlassPanel>
+          <h2 className="mb-2 font-medium">Languages</h2>
+          <LanguagesEditor
+            items={draft.languages}
+            onChange={(languages) => setDraft({ ...draft, languages })}
+          />
+        </GlassPanel>
+      </div>
+
+      {dirty && (
+        <div className="glass-elevated sticky bottom-4 flex items-center gap-3 px-4 py-3">
+          <p className="mr-auto text-sm text-ink-dim">Unsaved changes</p>
+          <Button variant="ghost" onClick={() => setDraft(profile)}>
+            Discard
+          </Button>
+          <Button disabled={save.isPending} onClick={() => save.mutate(draft)}>
+            {save.isPending ? "Saving…" : "Save profile"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }
