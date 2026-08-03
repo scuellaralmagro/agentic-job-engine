@@ -50,6 +50,30 @@ export function useIngest() {
   });
 }
 
+export interface ResetSummary {
+  source_documents: number;
+  files: number;
+  embeddings: number;
+}
+
+export function useResetProfile() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<ResetSummary>("/profile", { method: "DELETE" }),
+    onSuccess: (summary) => {
+      qc.invalidateQueries({ queryKey: ["profile"] });
+      qc.invalidateQueries({ queryKey: ["source-documents"] });
+      toast(
+        `Profile cleared — removed ${summary.source_documents} source document${
+          summary.source_documents === 1 ? "" : "s"
+        }`,
+      );
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiError ? e.detail : "Reset failed"),
+  });
+}
+
 export function useSourceDocuments() {
   return useQuery({
     queryKey: ["source-documents"],

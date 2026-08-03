@@ -1,5 +1,16 @@
 import { useEffect, useState } from "react";
-import { User } from "lucide-react";
+import { Trash2, User } from "lucide-react";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { EmptyState } from "@/components/EmptyState";
@@ -13,7 +24,12 @@ import {
   SkillsEditor,
 } from "./editors";
 import { IngestCard } from "./IngestCard";
-import { useProfile, useSaveProfile, useSourceDocuments } from "./queries";
+import {
+  useProfile,
+  useResetProfile,
+  useSaveProfile,
+  useSourceDocuments,
+} from "./queries";
 
 export function Provenance({ refs }: { refs: number[] }) {
   if (refs.length === 0)
@@ -33,6 +49,7 @@ export function ProfilePage() {
   const { data: profile, isPending, isError } = useProfile();
   const save = useSaveProfile();
   const sourceDocs = useSourceDocuments();
+  const reset = useResetProfile();
   const [draft, setDraft] = useState<ProfileData | null>(null);
 
   useEffect(() => {
@@ -146,6 +163,50 @@ export function ProfilePage() {
             ))}
           </ul>
         )}
+      </GlassPanel>
+
+      <GlassPanel className="flex flex-wrap items-center gap-4 border-danger/30">
+        <div className="mr-auto">
+          <h2 className="font-medium text-danger">Danger zone</h2>
+          <p className="text-sm text-ink-dim">
+            Delete the entire profile, every ingested document, and its stored
+            copies.
+          </p>
+        </div>
+        <AlertDialog>
+          <AlertDialogTrigger asChild>
+            <Button variant="outline" className="text-danger">
+              <Trash2 className="size-4" /> Delete profile
+            </Button>
+          </AlertDialogTrigger>
+          <AlertDialogContent className="glass-elevated">
+            <AlertDialogHeader>
+              <AlertDialogTitle>Delete everything in the profile?</AlertDialogTitle>
+              <AlertDialogDescription>
+                This clears every skill, experience, education entry, achievement
+                and language, deletes the {sourceDocs.data?.length ?? 0} ingested
+                document{(sourceDocs.data?.length ?? 0) === 1 ? "" : "s"} along
+                with the uploaded copies on disk, and drops the profile
+                embeddings. You can re-ingest afterwards. Saved offers and
+                tailored CVs are kept, but their fitness scores will be stale
+                until you rebuild the profile and rescore. This cannot be undone.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancel</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={reset.isPending}
+                onClick={() =>
+                  // drop the local draft too, or the page keeps showing the old
+                  // profile and reports phantom unsaved changes
+                  reset.mutate(undefined, { onSuccess: () => setDraft(null) })
+                }
+              >
+                {reset.isPending ? "Deleting…" : "Delete everything"}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
       </GlassPanel>
 
       {dirty && (

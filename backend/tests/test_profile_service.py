@@ -32,3 +32,72 @@ def test_list_source_documents_newest_first(session):
     session.commit()
     docs = list_source_documents(session)
     assert len(docs) == 2
+
+
+def test_reset_profile_clears_everything_and_allows_reingest(session, tmp_path):
+    """Source documents must go too: run_extraction dedups on content_hash, so
+    leaving them would make re-uploading the same CV a silent no-op."""
+    from aje.extraction.profile_service import reset_profile
+    from aje.extraction.schema import Skill
+    from aje.models import Embedding, SourceDocument
+
+    upload = tmp_path / "cv.pdf"
+    upload.write_bytes(b"%PDF-1.4 fake")
+
+    save_profile(session, ProfileData(skills=[Skill(name="Python")]))
+    session.add(
+        SourceDocument(
+            kind="cv", file_ref=str(upload), status="parsed", content_hash="abc"
+        )
+    )
+    session.add(
+        Embedding(
+            owner_kind="profile_item",
+            owner_id=1,
+            item_key="skill:python",
+            text_hash="h",
+            dim=3,
+            vector=b"\x00\x00\x00",
+        )
+    )
+    session.commit()
+
+    summary = reset_profile(session)
+
+    assert get_profile(session) == ProfileData()
+    assert list_source_documents(session) == []
+    assert session.query(Embedding).count() == 0
+    assert not upload.exists()
+    assert summary.source_documents == 1 and summary.files == 1
+    assert summary.embeddings == 1
+
+
+def test_reset_profile_leaves_offer_embeddings_alone(session):
+    """Offers are not profile data — a reset must not force a re-embed of them."""
+    from aje.extraction.profile_service import reset_profile
+    from aje.models import Embedding
+
+    session.add(
+        Embedding(
+            owner_kind="offer",
+            owner_id=7,
+            item_key="offer:7",
+            text_hash="h",
+            dim=3,
+            vector=b"\x00\x00\x00",
+        )
+    )
+    session.commit()
+
+    reset_profile(session)
+
+    assert session.query(Embedding).count() == 1
+
+
+def test_reset_profile_on_empty_state_is_a_noop(session):
+    from aje.extraction.profile_service import reset_profile
+
+    summary = reset_profile(session)
+
+    assert summary.source_documents == 0 and summary.embeddings == 0
+    assert get_profile(session) == ProfileData()

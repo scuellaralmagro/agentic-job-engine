@@ -47,6 +47,11 @@ def update_profile(
     return profile_service.save_profile(session, data)
 
 
+@router.delete("/profile")
+def reset(session: Session = Depends(get_db_session)) -> dict:
+    return profile_service.reset_profile(session).model_dump()
+
+
 @router.get("/source-documents")
 def source_documents(session: Session = Depends(get_db_session)) -> list[dict]:
     return [
