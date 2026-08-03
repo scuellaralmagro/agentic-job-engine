@@ -27,6 +27,29 @@ export function useSaveProfile() {
   });
 }
 
+export function useIngest() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) => {
+      const form = new FormData();
+      form.append("file", file);
+      return apiFetch<ProfileData>("/profile/ingest", {
+        method: "POST",
+        body: form,
+      });
+    },
+    onSuccess: (profile) => {
+      qc.setQueryData(["profile"], profile);
+      qc.invalidateQueries({ queryKey: ["source-documents"] });
+      toast(
+        `Merged into profile: ${profile.skills.length} skills, ${profile.experiences.length} experiences total`,
+      );
+    },
+    onError: (e) =>
+      toast.error(e instanceof ApiError ? e.detail : "Extraction failed"),
+  });
+}
+
 export function useSourceDocuments() {
   return useQuery({
     queryKey: ["source-documents"],

@@ -12,7 +12,8 @@ import {
   LanguagesEditor,
   SkillsEditor,
 } from "./editors";
-import { useProfile, useSaveProfile } from "./queries";
+import { IngestCard } from "./IngestCard";
+import { useProfile, useSaveProfile, useSourceDocuments } from "./queries";
 
 export function Provenance({ refs }: { refs: number[] }) {
   if (refs.length === 0)
@@ -31,6 +32,7 @@ export function Provenance({ refs }: { refs: number[] }) {
 export function ProfilePage() {
   const { data: profile, isPending, isError } = useProfile();
   const save = useSaveProfile();
+  const sourceDocs = useSourceDocuments();
   const [draft, setDraft] = useState<ProfileData | null>(null);
 
   useEffect(() => {
@@ -78,6 +80,9 @@ export function ProfilePage() {
             <p className="text-xs text-ink-dim">{label}</p>
           </div>
         ))}
+        <div className="w-full">
+          <IngestCard />
+        </div>
       </GlassPanel>
 
       <GlassPanel>
@@ -119,6 +124,29 @@ export function ProfilePage() {
           />
         </GlassPanel>
       </div>
+
+      <GlassPanel>
+        <h2 className="mb-2 font-medium">Source documents</h2>
+        {(sourceDocs.data ?? []).length === 0 ? (
+          <p className="text-sm text-ink-dim">Nothing ingested yet.</p>
+        ) : (
+          <ul className="space-y-1 text-sm">
+            {sourceDocs.data!.map((d) => (
+              <li key={d.id} className="flex items-center gap-2">
+                <Badge variant="outline">{d.kind}</Badge>
+                <span className="mr-auto truncate text-ink-dim">
+                  {d.file_ref}
+                </span>
+                <Badge
+                  variant={d.status === "extracted" ? "secondary" : "outline"}
+                >
+                  {d.status}
+                </Badge>
+              </li>
+            ))}
+          </ul>
+        )}
+      </GlassPanel>
 
       {dirty && (
         <div className="glass-elevated sticky bottom-4 flex items-center gap-3 px-4 py-3">
