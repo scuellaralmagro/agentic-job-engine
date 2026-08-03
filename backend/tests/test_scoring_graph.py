@@ -166,3 +166,61 @@ def test_score_all_unscored_picks_up_everything_without_a_match(
     summary = graph_mod.score_all_unscored(session, config=_config())
 
     assert summary.scored == 1 and summary.gated == 1
+
+
+def test_progress_reports_scoring_before_the_llm_call(
+    session, fake_embeddings, profile, monkeypatch
+):
+    """Discovery needs to know an offer is mid-LLM-call, not only afterwards."""
+    llm = _CountingLLM(_rubric())
+    monkeypatch.setattr(rubric_mod, "llm_for", lambda task: llm)
+    offer = _offer(session, "Backend Engineer", "python fastapi postgres", "p1")
+
+    seen: list[tuple[int, str, str | None]] = []
+    graph_mod.score_offers(
+        session,
+        [offer.id],
+        config=_config(),
+        progress=lambda oid, st, err: seen.append((oid, st, err)),
+    )
+
+    assert seen == [(offer.id, "scoring", None), (offer.id, "scored", None)]
+
+
+def test_progress_reports_a_gated_offer_as_prefiltered(
+    session, fake_embeddings, profile, monkeypatch
+):
+    llm = _CountingLLM(_rubric())
+    monkeypatch.setattr(rubric_mod, "llm_for", lambda task: llm)
+    offer = _offer(session, "Nurse", "nurse sales", "p2")
+
+    seen: list[tuple[int, str, str | None]] = []
+    graph_mod.score_offers(
+        session,
+        [offer.id],
+        config=_config(),
+        progress=lambda oid, st, err: seen.append((oid, st, err)),
+    )
+
+    assert llm.calls == 0
+    assert seen[-1] == (offer.id, "prefiltered", None)
+
+
+def test_progress_reports_a_failure_without_aborting_the_run(
+    session, fake_embeddings, profile, monkeypatch
+):
+    llm = _CountingLLM(RuntimeError("llm down"))
+    monkeypatch.setattr(rubric_mod, "llm_for", lambda task: llm)
+    gated = _offer(session, "Nurse", "nurse sales", "p3")
+    bad = _offer(session, "Backend Engineer", "python fastapi", "p4")
+
+    seen: list[tuple[int, str, str | None]] = []
+    graph_mod.score_offers(
+        session,
+        [bad.id, gated.id],
+        config=_config(),
+        progress=lambda oid, st, err: seen.append((oid, st, err)),
+    )
+
+    assert (bad.id, "failed", "llm down") in seen
+    assert (gated.id, "prefiltered", None) in seen

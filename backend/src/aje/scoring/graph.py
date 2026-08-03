@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import TypedDict
+from typing import Callable, TypedDict
 
 from langgraph.graph import END, StateGraph
 from sqlalchemy import select
@@ -92,7 +92,10 @@ def score_offers(
     *,
     rescore: bool = False,
     config: ScoringConfig | None = None,
+    progress: Callable[[int, str, str | None], None] | None = None,
 ) -> ScoringSummary:
+    """`progress(offer_id, status, error)` fires around each offer so a caller can
+    record that the LLM is reading it right now, not only what it concluded."""
     summary = ScoringSummary()
     if not offer_ids:
         return summary
@@ -112,6 +115,8 @@ def score_offers(
         if offer is None:
             summary.skipped += 1
             continue
+        if progress is not None:
+            progress(offer_id, "scoring", None)
         try:
             result = graph.invoke(
                 {
@@ -125,11 +130,17 @@ def score_offers(
             logger.warning("scoring offer %s failed: %s", offer_id, exc)
             summary.failed += 1
             summary.errors.append(f"offer {offer_id}: {exc}")
+            if progress is not None:
+                progress(offer_id, "failed", str(exc))
             continue
         if result["outcome"] == "scored":
             summary.scored += 1
+            if progress is not None:
+                progress(offer_id, "scored", None)
         else:
             summary.gated += 1
+            if progress is not None:
+                progress(offer_id, "prefiltered", None)
     return summary
 
 
@@ -139,6 +150,7 @@ def score_all_unscored(
     since: datetime | None = None,
     rescore: bool = False,
     config: ScoringConfig | None = None,
+    progress: Callable[[int, str, str | None], None] | None = None,
 ) -> ScoringSummary:
     stmt = select(Offer.id)
     if since is not None:
@@ -147,5 +159,9 @@ def score_all_unscored(
         scored = select(Match.offer_id).where(Match.profile_id == PROFILE_ID)
         stmt = stmt.where(Offer.id.not_in(scored))
     return score_offers(
-        session, list(session.execute(stmt).scalars()), rescore=rescore, config=config
+        session,
+        list(session.execute(stmt).scalars()),
+        rescore=rescore,
+        config=config,
+        progress=progress,
     )
