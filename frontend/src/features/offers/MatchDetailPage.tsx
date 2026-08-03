@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { GlassPanel } from "@/components/GlassPanel";
 import { useSetStatus } from "@/features/queue/queries";
+import { AdaptActions } from "./AdaptActions";
 import { FitnessPanel } from "./FitnessPanel";
 import { useMatch } from "./queries";
 
@@ -95,7 +96,7 @@ export function MatchDetailPage() {
               Dismiss
             </Button>
           </div>
-          <section data-testid="actions" />
+          <AdaptActions match={match} />
         </GlassPanel>
       </div>
     </div>
