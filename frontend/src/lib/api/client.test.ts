@@ -18,9 +18,9 @@ test("throws ApiError with backend detail on failure", async () => {
     ),
   );
   const err = await apiFetch("/matches/1/adapt", { method: "POST" }).catch(
-    (e) => e,
+    (e: unknown) => e,
   );
   expect(err).toBeInstanceOf(ApiError);
-  expect(err.status).toBe(404);
-  expect(err.detail).toBe("match not found");
+  expect((err as ApiError).status).toBe(404);
+  expect((err as ApiError).detail).toBe("match not found");
 });

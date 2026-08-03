@@ -12,7 +12,7 @@ export function StatCard({
 }) {
   return (
     <GlassPanel className="flex items-center gap-4">
-      <div className="rounded-xl bg-accent/10 p-2.5 text-accent">
+      <div className="rounded-xl bg-brand/10 p-2.5 text-brand">
         <Icon className="size-5" aria-hidden />
       </div>
       <div>

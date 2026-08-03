@@ -11,8 +11,10 @@
   --color-bg: #0a0a0f;
   --color-surface: #131318;
   --color-surface-2: #1a1a22;
-  --color-accent: #818cf8;
-  --color-accent-strong: #6366f1;
+  /* Brand indigo. Deliberately NOT called "accent": shadcn's own --accent token
+     means "subtle hover surface" and would override this one. */
+  --color-brand: #818cf8;
+  --color-brand-strong: #6366f1;
   --color-ok: #34d399;
   --color-warn: #fbbf24;
   --color-danger: #f87171;
