@@ -15,6 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "@/components/EmptyState";
 import { GlassPanel } from "@/components/GlassPanel";
+import { DocumentsTab } from "./DocumentsTab";
 import {
   useDeleteProjection,
   useProjections,
@@ -101,7 +102,7 @@ export function LibraryPage() {
           )}
         </TabsContent>
         <TabsContent value="documents">
-          <div data-testid="documents-tab" />
+          <DocumentsTab />
         </TabsContent>
       </Tabs>
     </div>
