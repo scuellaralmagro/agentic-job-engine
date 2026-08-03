@@ -30,8 +30,9 @@ def _run(session, monkeypatch, *, score, spy):
 def test_new_offers_are_scored_after_a_run(session, monkeypatch):
     seen = {}
 
-    def _spy(sess, offer_ids):
+    def _spy(sess, offer_ids, **kwargs):
         seen["ids"] = offer_ids
+        seen["progress"] = kwargs.get("progress")
         from aje.scoring.schema import ScoringSummary
 
         return ScoringSummary(scored=len(offer_ids))
@@ -40,17 +41,19 @@ def test_new_offers_are_scored_after_a_run(session, monkeypatch):
 
     assert run.offers_new == 1
     assert len(seen["ids"]) == 1
+    # discovery hands scoring a progress sink so result rows track the LLM call
+    assert callable(seen["progress"])
 
 
 def test_scoring_can_be_switched_off(session, monkeypatch):
-    def _spy(sess, offer_ids):
+    def _spy(sess, offer_ids, **kwargs):
         raise AssertionError("scoring should not have run")
 
     _run(session, monkeypatch, score=False, spy=_spy)
 
 
 def test_a_scoring_failure_never_fails_the_discovery_run(session, monkeypatch):
-    def _boom(sess, offer_ids):
+    def _boom(sess, offer_ids, **kwargs):
         raise RuntimeError("embeddings down")
 
     run = _run(session, monkeypatch, score=True, spy=_boom)

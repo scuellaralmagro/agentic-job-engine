@@ -150,3 +150,82 @@ def test_run_saved_search_uses_stored_query_and_links_run(session, monkeypatch):
     assert run.saved_search_id == saved.id
     assert run.offers_new == 1
     assert session.query(DiscoveryRun).count() == 1
+
+
+def test_run_records_a_result_for_every_offer_including_refinds(session):
+    """A search that surfaces nothing new still returned something."""
+    from aje.discovery.results import results_for_run
+
+    adapter = _StubAdapter("stub", [_raw("Backend Engineer")])
+
+    first = graph_mod.run_discovery(
+        session, term="python", adapters=[adapter], score=False
+    )
+    second = graph_mod.run_discovery(
+        session, term="python", adapters=[adapter], score=False
+    )
+
+    assert session.query(Offer).count() == 1  # still deduped
+
+    first_results = results_for_run(session, first.id)
+    second_results = results_for_run(session, second.id)
+    assert len(first_results) == 1 and first_results[0].is_new is True
+    assert len(second_results) == 1 and second_results[0].is_new is False
+
+
+def test_the_run_records_what_was_searched(session):
+    """A manual run with no saved search would otherwise be anonymous in history."""
+    adapter = _StubAdapter("stub", [])
+
+    run = graph_mod.run_discovery(
+        session, term="golang remote", adapters=[adapter], score=False
+    )
+
+    assert run.term == "golang remote"
+    assert run.kind == "manual"
+
+
+def test_scoring_transitions_are_recorded_on_the_result(session, monkeypatch):
+    from aje.discovery.results import results_for_run
+    from aje.scoring.schema import ScoringSummary
+
+    adapter = _StubAdapter("stub", [_raw("A")])
+
+    def _fake_score(sess, offer_ids, *, rescore=False, config=None, progress=None):
+        for oid in offer_ids:
+            progress(oid, "scoring", None)
+            progress(oid, "scored", None)
+        return ScoringSummary(scored=len(offer_ids))
+
+    monkeypatch.setattr(graph_mod, "score_offers", _fake_score)
+
+    run = graph_mod.run_discovery(session, term="python", adapters=[adapter], score=True)
+
+    assert results_for_run(session, run.id)[0].status == "scored"
+
+
+def test_max_offers_caps_scoring_not_recording(session, monkeypatch):
+    """The cap is a spend limit, so it caps the LLM calls — nothing is hidden."""
+    from aje.discovery.results import results_for_run
+    from aje.scoring.schema import ScoringSummary
+
+    raws = [_raw(f"Job {i}", url=f"https://x/{i}") for i in range(5)]
+    adapter = _StubAdapter("stub", raws)
+    scored: list[int] = []
+
+    def _fake_score(sess, offer_ids, *, rescore=False, config=None, progress=None):
+        scored.extend(offer_ids)
+        for oid in offer_ids:
+            progress(oid, "scored", None)
+        return ScoringSummary(scored=len(offer_ids))
+
+    monkeypatch.setattr(graph_mod, "score_offers", _fake_score)
+
+    run = graph_mod.run_discovery(
+        session, term="python", adapters=[adapter], score=True, max_offers=2
+    )
+
+    assert len(scored) == 2
+    results = results_for_run(session, run.id)
+    assert len(results) == 5
+    assert sum(1 for r in results if r.status == "discovered") == 3
