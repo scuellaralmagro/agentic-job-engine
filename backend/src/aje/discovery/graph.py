@@ -14,6 +14,7 @@ from aje.discovery.normalize import normalize_text, to_offer
 from aje.discovery.registry import build_adapters
 from aje.discovery.schema import RawOffer, SearchQuery, SourceResult
 from aje.models import DiscoveryRun, Offer, SavedSearch
+from aje.scoring.graph import score_offers
 
 logger = logging.getLogger(__name__)
 
@@ -128,9 +129,9 @@ def _status_for(results: list[dict]) -> str:
     return "partial" if failed else "ok"
 
 
-def _persist_offers(session: Session, offers: list[Offer]) -> int:
+def _persist_offers(session: Session, offers: list[Offer]) -> list[Offer]:
     if not offers:
-        return 0
+        return []
     hashes = [o.content_hash for o in offers]
     existing = set(
         session.execute(
@@ -140,7 +141,7 @@ def _persist_offers(session: Session, offers: list[Offer]) -> int:
     new_offers = [o for o in offers if o.content_hash not in existing]
     session.add_all(new_offers)
     session.commit()
-    return len(new_offers)
+    return new_offers
 
 
 def run_discovery(
@@ -152,6 +153,7 @@ def run_discovery(
     filters: dict | None = None,
     saved_search_id: int | None = None,
     adapters: list | None = None,
+    score: bool = True,
 ) -> DiscoveryRun:
     if adapters is None:
         adapters = build_adapters(get_sources_config(), get_settings())
@@ -169,7 +171,7 @@ def run_discovery(
 
     source_results = [r.model_dump() for r in result["source_results"]]
     kept = result["kept"]
-    offers_new = _persist_offers(session, kept)
+    new_offers = _persist_offers(session, kept)
 
     run = DiscoveryRun(
         saved_search_id=saved_search_id,
@@ -177,15 +179,25 @@ def run_discovery(
         finished_at=datetime.utcnow(),
         status=_status_for(source_results),
         offers_found=len(result["raw_offers"]),
-        offers_new=offers_new,
+        offers_new=len(new_offers),
         source_results=source_results,
     )
     session.add(run)
     session.commit()
+
+    if score and new_offers:
+        try:
+            summary = score_offers(session, [o.id for o in new_offers])
+            logger.info("scored %s new offers: %s", len(new_offers), summary.model_dump())
+        except Exception as exc:  # noqa: BLE001 - discovery must survive a scoring outage
+            logger.warning("scoring after discovery failed: %s", exc)
+
     return run
 
 
-def run_saved_search(session: Session, saved_search_id: int) -> DiscoveryRun:
+def run_saved_search(
+    session: Session, saved_search_id: int, *, score: bool = True
+) -> DiscoveryRun:
     saved = session.get(SavedSearch, saved_search_id)
     if saved is None:
         raise ValueError(f"no saved search with id {saved_search_id}")
@@ -197,4 +209,5 @@ def run_saved_search(session: Session, saved_search_id: int) -> DiscoveryRun:
         remote=filters.get("remote"),
         filters=filters,
         saved_search_id=saved.id,
+        score=score,
     )
