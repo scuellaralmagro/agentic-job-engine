@@ -1,0 +1,16 @@
+# Weights must sum to 1.0 — validated at load.
+weights:
+  skills: 0.5
+  seniority: 0.2
+  domain: 0.2
+  language: 0.1
+
+prefilter:
+  # Conservative default. Replace with a value taken from
+  # `uv run python -m scripts.calibrate_threshold` once you have real offers.
+  min_similarity: 0.30
+  top_k: 8
+  chunk_chars: 800
+
+queue:
+  threshold: 60
