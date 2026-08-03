@@ -1,6 +1,10 @@
 # Local design/spec docs — kept out of version control
 docs/
 
+# Runtime data: the local database and the stored copies of uploaded CVs.
+# The uploads are personal data and must never reach the remote.
+backend/data/
+
 # Python
 __pycache__/
 *.py[cod]
