@@ -21,6 +21,7 @@ class Base(DeclarativeBase):
 class Profile(Base):
     __tablename__ = "profile"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact: Mapped[dict] = mapped_column(JSON, default=dict)
     skills: Mapped[list] = mapped_column(JSON, default=list)
     experiences: Mapped[list] = mapped_column(JSON, default=list)
     education: Mapped[list] = mapped_column(JSON, default=list)

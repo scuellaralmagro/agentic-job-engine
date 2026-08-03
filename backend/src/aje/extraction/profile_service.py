@@ -12,6 +12,7 @@ def get_profile(session: Session) -> ProfileData:
     if row is None:
         return ProfileData()
     return ProfileData(
+        contact=row.contact or {},
         skills=row.skills or [],
         experiences=row.experiences or [],
         education=row.education or [],
@@ -25,6 +26,7 @@ def save_profile(session: Session, data: ProfileData) -> ProfileData:
     if row is None:
         row = Profile(id=PROFILE_ID)
         session.add(row)
+    row.contact = data.contact.model_dump()
     row.skills = [s.model_dump() for s in data.skills]
     row.experiences = [e.model_dump() for e in data.experiences]
     row.education = [e.model_dump() for e in data.education]

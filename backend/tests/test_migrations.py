@@ -18,3 +18,5 @@ def test_upgrade_head_builds_schema(tmp_path, monkeypatch):
     assert "embeddings" in tables
     match_cols = {c["name"] for c in inspect(engine).get_columns("matches")}
     assert {"status", "scored_by", "similarity", "scored_at"} <= match_cols
+    profile_cols = {c["name"] for c in inspect(engine).get_columns("profile")}
+    assert "contact" in profile_cols
