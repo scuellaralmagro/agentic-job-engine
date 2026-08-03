@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/select";
 import type { MatchOut, MatchStatus } from "@/lib/api/types";
 import { QueueRow } from "./QueueRow";
+import { useQueueKeyboard } from "./useQueueKeyboard";
 import { useQueue, useSetStatus } from "./queries";
 
 export function QueuePage() {
@@ -63,6 +64,11 @@ export function QueuePage() {
         ? (b.offer?.created_at ?? "").localeCompare(a.offer?.created_at ?? "")
         : b.fitness - a.fitness,
     );
+
+  const selectedId = useQueueKeyboard(rows, {
+    onAccept: (m) => act(m, "accept"),
+    onDismiss: (m) => act(m, "dismiss"),
+  });
 
   return (
     <div className="space-y-4">
@@ -138,7 +144,7 @@ export function QueuePage() {
           <QueueRow
             key={m.id}
             match={m}
-            selected={false}
+            selected={m.id === selectedId}
             onAccept={() => act(m, "accept")}
             onDismiss={() => act(m, "dismiss")}
           />
