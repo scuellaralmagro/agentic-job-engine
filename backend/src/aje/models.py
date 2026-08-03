@@ -1,6 +1,16 @@
 from datetime import datetime
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    JSON,
+    DateTime,
+    Float,
+    ForeignKey,
+    Integer,
+    LargeBinary,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -68,6 +78,9 @@ class SavedSearch(Base):
 
 class Match(Base):
     __tablename__ = "matches"
+    __table_args__ = (
+        UniqueConstraint("offer_id", "profile_id", name="uq_matches_offer_profile"),
+    )
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     offer_id: Mapped[int] = mapped_column(ForeignKey("offers.id"))
     profile_id: Mapped[int | None] = mapped_column(ForeignKey("profile.id"), nullable=True)
@@ -79,6 +92,10 @@ class Match(Base):
     gaps: Mapped[list] = mapped_column(JSON, default=list)
     explanation: Mapped[str | None] = mapped_column(Text, nullable=True)
     above_threshold: Mapped[bool] = mapped_column(default=False)
+    status: Mapped[str] = mapped_column(String(16), default="new")  # new|accepted|dismissed
+    scored_by: Mapped[str] = mapped_column(String(16), default="rubric")  # vector|rubric
+    similarity: Mapped[float | None] = mapped_column(Float, nullable=True)
+    scored_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 
@@ -106,3 +123,20 @@ class DiscoveryRun(Base):
     offers_found: Mapped[int] = mapped_column(Integer, default=0)
     offers_new: Mapped[int] = mapped_column(Integer, default=0)
     source_results: Mapped[list] = mapped_column(JSON, default=list)
+
+
+class Embedding(Base):
+    __tablename__ = "embeddings"
+    __table_args__ = (
+        UniqueConstraint(
+            "owner_kind", "owner_id", "item_key", name="uq_embeddings_owner_item"
+        ),
+    )
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    owner_kind: Mapped[str] = mapped_column(String(32))  # "profile_item" | "offer"
+    owner_id: Mapped[int] = mapped_column(Integer)
+    item_key: Mapped[str] = mapped_column(String(255))
+    text_hash: Mapped[str] = mapped_column(String(64))
+    dim: Mapped[int] = mapped_column(Integer)
+    vector: Mapped[bytes] = mapped_column(LargeBinary)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)

@@ -5,6 +5,7 @@ from sqlalchemy import text
 
 from aje.api.discovery import router as discovery_router
 from aje.api.profile import router as profile_router
+from aje.api.scoring import router as scoring_router
 from aje.db import get_engine, get_session, vec_version
 from aje.discovery.scheduler import get_scheduler, sync_all_jobs
 from aje.llm.providers import register_default_providers
@@ -30,6 +31,7 @@ def create_app() -> FastAPI:
     register_default_providers()
     app.include_router(profile_router)
     app.include_router(discovery_router)
+    app.include_router(scoring_router)
 
     @app.get("/health")
     def health() -> dict:

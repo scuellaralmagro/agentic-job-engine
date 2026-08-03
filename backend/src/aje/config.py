@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     database_url: str | None = None
     models_config_path: Path = Path("./config/models.yaml")
     sources_config_path: Path = Path("./config/sources.yaml")
+    scoring_config_path: Path = Path("./config/scoring.yaml")
 
     adzuna_app_id: str | None = None
     adzuna_app_key: str | None = None

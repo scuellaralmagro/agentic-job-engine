@@ -1,0 +1,63 @@
+[
+  {
+    "name": "strong senior backend match",
+    "rubric": {
+      "skills": {"score": 90, "evidence": "Python, FastAPI and Postgres all present"},
+      "seniority": {"score": 85, "evidence": "8 years, led a team of 4"},
+      "domain": {"score": 70, "evidence": "Payments vs fintech lending"},
+      "language": {"score": 100, "evidence": "Spanish native, English C1"},
+      "dealbreaker": false,
+      "gaps": [{"requirement": "Kubernetes at scale", "severity": "minor", "profile_has": "Docker Compose"}],
+      "requirements": {"skills": ["Python", "FastAPI"], "seniority": "senior", "languages": ["Spanish"]},
+      "explanation": "Very strong fit."
+    },
+    "expected_fitness": 86.0,
+    "expected_above_threshold": true
+  },
+  {
+    "name": "adjacent role, weak stack overlap",
+    "rubric": {
+      "skills": {"score": 35, "evidence": "Java shop, candidate is Python"},
+      "seniority": {"score": 80, "evidence": "Seniority matches"},
+      "domain": {"score": 60, "evidence": "Both backend web services"},
+      "language": {"score": 100, "evidence": "Meets Spanish requirement"},
+      "dealbreaker": false,
+      "gaps": [{"requirement": "Java", "severity": "major", "profile_has": "Python"}],
+      "requirements": {"skills": ["Java", "Spring"], "seniority": "senior", "languages": ["Spanish"]},
+      "explanation": "Right level, wrong stack."
+    },
+    "expected_fitness": 55.5,
+    "expected_above_threshold": false
+  },
+  {
+    "name": "perfect on paper but requires a work permit",
+    "rubric": {
+      "skills": {"score": 95, "evidence": "Exact stack match"},
+      "seniority": {"score": 95, "evidence": "Exact level match"},
+      "domain": {"score": 95, "evidence": "Same industry"},
+      "language": {"score": 95, "evidence": "Meets requirements"},
+      "dealbreaker": true,
+      "dealbreaker_reason": "Requires an existing US work authorisation",
+      "gaps": [{"requirement": "US work authorisation", "severity": "blocker", "profile_has": null}],
+      "requirements": {"skills": ["Python"], "seniority": "staff", "languages": ["English"]},
+      "explanation": "Excellent technically, legally blocked."
+    },
+    "expected_fitness": 95.0,
+    "expected_above_threshold": false
+  },
+  {
+    "name": "junior offer for a senior candidate",
+    "rubric": {
+      "skills": {"score": 85, "evidence": "Knows everything asked"},
+      "seniority": {"score": 20, "evidence": "Offer targets 0-2 years"},
+      "domain": {"score": 70, "evidence": "Same domain"},
+      "language": {"score": 100, "evidence": "Fine"},
+      "dealbreaker": false,
+      "gaps": [],
+      "requirements": {"skills": ["Python"], "seniority": "junior", "languages": ["Spanish"]},
+      "explanation": "Overqualified."
+    },
+    "expected_fitness": 70.5,
+    "expected_above_threshold": true
+  }
+]

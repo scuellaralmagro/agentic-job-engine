@@ -1,7 +1,7 @@
 import pytest
-from sqlalchemy import create_engine
 from sqlalchemy.orm import Session, sessionmaker
 
+from aje.db import make_engine
 from aje.models import Base
 
 
@@ -26,7 +26,9 @@ def _reset_scheduler():
 
 @pytest.fixture
 def session(tmp_path):
-    engine = create_engine(f"sqlite:///{(tmp_path / 'test.sqlite3').as_posix()}")
+    # make_engine (not create_engine) so every connection loads sqlite-vec —
+    # the prefilter calls vec_distance_cosine() on this session
+    engine = make_engine(f"sqlite:///{(tmp_path / 'test.sqlite3').as_posix()}")
     Base.metadata.create_all(engine)
     sess = sessionmaker(bind=engine, class_=Session, expire_on_commit=False)()
     yield sess

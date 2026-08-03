@@ -46,5 +46,5 @@ build-backend = "hatchling.build"
 packages = ["src/aje"]
 
 [tool.pytest.ini_options]
-pythonpath = ["src"]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
