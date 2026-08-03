@@ -8,6 +8,7 @@ from aje.api.discovery import router as discovery_router
 from aje.api.profile import router as profile_router
 from aje.api.scoring import router as scoring_router
 from aje.db import get_engine, get_session, vec_version
+from aje.discovery.jobs import reconcile_orphaned_runs
 from aje.discovery.scheduler import get_scheduler, sync_all_jobs
 from aje.llm.providers import register_default_providers
 
@@ -18,6 +19,9 @@ async def _lifespan(app: FastAPI):
     session = get_session()
     try:
         sync_all_jobs(scheduler, session)
+        # Any run still "running" was orphaned by the previous process exiting;
+        # left alone it would make the UI poll a job that will never finish.
+        reconcile_orphaned_runs(session)
     finally:
         session.close()
     scheduler.start()
