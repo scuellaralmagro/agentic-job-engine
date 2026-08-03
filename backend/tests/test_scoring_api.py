@@ -116,3 +116,14 @@ def test_queue_offer_payload_includes_description_and_created_at(session):
 
     assert body[0]["offer"]["description"] == "We need a Python engineer."
     assert body[0]["offer"]["created_at"] is not None
+
+
+def test_reset_returns_match_to_queue(session):
+    match = _match(session, title="A", fitness=70.0, h="h1")
+    client = _client(session)
+
+    client.post(f"/matches/{match.id}/dismiss")
+    assert client.get("/queue").json() == []
+
+    assert client.post(f"/matches/{match.id}/reset").json()["status"] == "new"
+    assert len(client.get("/queue").json()) == 1

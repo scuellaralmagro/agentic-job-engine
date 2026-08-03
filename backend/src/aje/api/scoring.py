@@ -94,6 +94,11 @@ def dismiss_match(match_id: int, session: Session = Depends(get_db_session)) -> 
     return _set_status(session, match_id, "dismissed")
 
 
+@router.post("/matches/{match_id}/reset")
+def reset_match(match_id: int, session: Session = Depends(get_db_session)) -> dict:
+    return _set_status(session, match_id, "new")
+
+
 @router.post("/score")
 def run_scoring(body: ScoreIn, session: Session = Depends(get_db_session)) -> dict:
     try:
