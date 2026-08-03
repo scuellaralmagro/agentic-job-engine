@@ -108,11 +108,13 @@ export function RunDetailPage() {
         </label>
       </div>
 
-      <GlassPanel>
+      {/* The status column is the point of this table — let it scroll rather than
+          clip when titles are long. */}
+      <GlassPanel className="overflow-x-auto">
         {rows.length === 0 ? (
           <EmptyState icon={Inbox} title="No results match these filters" />
         ) : (
-          <Table>
+          <Table className="min-w-3xl">
             <TableHeader>
               <TableRow>
                 <TableHead>Fitness</TableHead>
@@ -130,7 +132,7 @@ export function RunDetailPage() {
                   <TableCell>
                     {r.match ? <FitnessBadge fitness={r.match.fitness} /> : "—"}
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="max-w-96 truncate" title={r.offer?.title}>
                     {r.match ? (
                       <Link
                         to={`/matches/${r.match.id}`}

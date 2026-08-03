@@ -10,6 +10,7 @@ test("renders nav links and health indicator", async () => {
 
   for (const label of [
     "Dashboard",
+    "Search",
     "Queue",
     "Library",
     "Profile",

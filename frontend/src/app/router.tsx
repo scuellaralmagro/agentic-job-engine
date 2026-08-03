@@ -3,6 +3,8 @@ import { GlassPanel } from "@/components/GlassPanel";
 import { Layout } from "./Layout";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { QueuePage } from "@/features/queue/QueuePage";
+import { SearchPage } from "@/features/search/SearchPage";
+import { RunDetailPage } from "@/features/search/RunDetailPage";
 import { MatchDetailPage } from "@/features/offers/MatchDetailPage";
 import { LibraryPage } from "@/features/library/LibraryPage";
 import { ProjectionEditorPage } from "@/features/library/ProjectionEditorPage";
@@ -26,6 +28,8 @@ export const router = createBrowserRouter([
     errorElement: <RouteError />,
     children: [
       { path: "/", element: <DashboardPage /> },
+      { path: "/search", element: <SearchPage /> },
+      { path: "/search/runs/:id", element: <RunDetailPage /> },
       { path: "/queue", element: <QueuePage /> },
       { path: "/matches/:id", element: <MatchDetailPage /> },
       { path: "/library", element: <LibraryPage /> },

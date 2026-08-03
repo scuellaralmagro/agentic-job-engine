@@ -1,11 +1,19 @@
 import { useQuery } from "@tanstack/react-query";
-import { Inbox, LayoutDashboard, Library, Settings, User } from "lucide-react";
+import {
+  Inbox,
+  LayoutDashboard,
+  Library,
+  Search,
+  Settings,
+  User,
+} from "lucide-react";
 import { NavLink, Outlet } from "react-router";
 import { apiFetch } from "@/lib/api/client";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, end: true },
+  { to: "/search", label: "Search", icon: Search },
   { to: "/queue", label: "Queue", icon: Inbox },
   { to: "/library", label: "Library", icon: Library },
   { to: "/profile", label: "Profile", icon: User },

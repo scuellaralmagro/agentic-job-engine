@@ -37,18 +37,23 @@ export function useDocs() {
   });
 }
 
+/** Takes no run: an asynchronous run has produced nothing yet, so there is nothing
+ *  to report beyond the fact that it started. Claiming counts here would be a lie. */
+export function runStartedMessage(): string {
+  return "Run started — watch it in Search";
+}
+
 export function useRunSearch() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (searchId: number) =>
       apiFetch<RunOut>(`/searches/${searchId}/run`, { method: "POST" }),
-    onSuccess: (run) => {
+    onSuccess: () => {
       ["runs", "queue", "offers"].forEach((key) =>
         qc.invalidateQueries({ queryKey: [key] }),
       );
-      toast(`Run finished: ${run.offers_new} new offers`);
+      toast(runStartedMessage());
     },
-    onError: (e) =>
-      toast.error(e instanceof ApiError ? e.detail : "Run failed"),
+    onError: (e) => toast.error(e instanceof ApiError ? e.detail : "Run failed"),
   });
 }
