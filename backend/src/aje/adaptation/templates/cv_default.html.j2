@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="{{ cv.language }}">
+<head>
+<meta charset="utf-8">
+<title>{{ cv.contact.full_name or "CV" }}</title>
+<style>
+  @page { size: {{ page.format }}; margin: {{ page.margin_mm }}mm; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+         font-size: 10.5pt; line-height: 1.42; color: #1f2328; margin: 0; }
+  /* @page governs the PDF; on screen it does nothing, so the preview needs its
+     own inset or it diverges from the printed document. */
+  @media screen { body { padding: {{ page.margin_mm }}mm; } }
+  h1 { font-size: 20pt; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.08em;
+       color: #57606a; border-bottom: 1px solid #d0d7de;
+       padding-bottom: 3px; margin: 16px 0 8px; }
+  .subtitle { font-size: 11.5pt; color: #57606a; margin: 3px 0 5px; }
+  .contact { font-size: 9pt; color: #57606a; }
+  .contact a { color: #57606a; text-decoration: none; }
+  .summary { margin: 0; }
+  .exp { margin-bottom: 11px; page-break-inside: avoid; }
+  .exp-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .role { font-weight: 600; }
+  .period { color: #57606a; font-size: 9pt; white-space: nowrap; padding-left: 12px; }
+  ul { margin: 4px 0 0; padding-left: 18px; }
+  li { margin-bottom: 2px; }
+  .inline { margin: 0; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>{{ cv.contact.full_name or "" }}</h1>
+    {% if cv.headline %}
+    <div class="subtitle">{{ cv.headline }}</div>
+    {% endif %}
+    <div class="contact">
+      {{ [cv.contact.email, cv.contact.phone, cv.contact.location] | select | join(" · ") }}
+      {%- for link in cv.contact.links %} · <a href="{{ link.url }}">{{ link.label }}</a>{% endfor %}
+    </div>
+  </header>
+
+  {% if cv.summary %}
+  <h2>Profile</h2>
+  <p class="summary">{{ cv.summary }}</p>
+  {% endif %}
+
+  {% if cv.experiences %}
+  <h2>Experience</h2>
+  {% for exp in cv.experiences %}
+  <div class="exp">
+    <div class="exp-head">
+      <span class="role">{{ exp.title }} — {{ exp.company }}</span>
+      {% if exp.period %}<span class="period">{{ exp.period }}</span>{% endif %}
+    </div>
+    {% if exp.bullets %}
+    <ul>
+      {% for bullet in exp.bullets %}
+      <li>{{ bullet }}</li>
+      {% endfor %}
+    </ul>
+    {% endif %}
+  </div>
+  {% endfor %}
+  {% endif %}
+
+  {% if cv.skills %}
+  <h2>Skills</h2>
+  <p class="inline">{{ cv.skills | join(" · ") }}</p>
+  {% endif %}
+
+  {% if cv.education %}
+  <h2>Education</h2>
+  <ul>
+    {% for item in cv.education %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if cv.achievements %}
+  <h2>Achievements</h2>
+  <ul>
+    {% for item in cv.achievements %}
+    <li>{{ item }}</li>
+    {% endfor %}
+  </ul>
+  {% endif %}
+
+  {% if cv.languages %}
+  <h2>Languages</h2>
+  <p class="inline">{{ cv.languages | join(" · ") }}</p>
+  {% endif %}
+</body>
+</html>

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Ada Lovelace</title>
+<style>
+  @page { size: A4; margin: 15mm; }
+  body { font-family: "Helvetica Neue", Helvetica, Arial, sans-serif;
+         font-size: 10.5pt; line-height: 1.42; color: #1f2328; margin: 0; }
+  /* @page governs the PDF; on screen it does nothing, so the preview needs its
+     own inset or it diverges from the printed document. */
+  @media screen { body { padding: 15mm; } }
+  h1 { font-size: 20pt; margin: 0; letter-spacing: -0.01em; }
+  h2 { font-size: 10pt; text-transform: uppercase; letter-spacing: 0.08em;
+       color: #57606a; border-bottom: 1px solid #d0d7de;
+       padding-bottom: 3px; margin: 16px 0 8px; }
+  .subtitle { font-size: 11.5pt; color: #57606a; margin: 3px 0 5px; }
+  .contact { font-size: 9pt; color: #57606a; }
+  .contact a { color: #57606a; text-decoration: none; }
+  .summary { margin: 0; }
+  .exp { margin-bottom: 11px; page-break-inside: avoid; }
+  .exp-head { display: flex; justify-content: space-between; align-items: baseline; }
+  .role { font-weight: 600; }
+  .period { color: #57606a; font-size: 9pt; white-space: nowrap; padding-left: 12px; }
+  ul { margin: 4px 0 0; padding-left: 18px; }
+  li { margin-bottom: 2px; }
+  .inline { margin: 0; }
+</style>
+</head>
+<body>
+  <header>
+    <h1>Ada Lovelace</h1>
+    <div class="subtitle">Backend Engineer</div>
+    <div class="contact">
+      ada@example.com · +34 600 000 000 · Madrid, Spain · <a href="https://github.com/ada">GitHub</a>    </div>
+  </header>
+
+  <h2>Profile</h2>
+  <p class="summary">Builds Python APIs that stay up.</p>
+
+  <h2>Experience</h2>
+  <div class="exp">
+    <div class="exp-head">
+      <span class="role">Backend Engineer — Acme</span>
+<span class="period">2021 - 2024</span>    </div>
+    <ul>
+      <li>Owned the billing API</li>
+      <li>Cut p99 latency 40%</li>
+    </ul>
+  </div>
+
+  <h2>Skills</h2>
+  <p class="inline">Python · FastAPI</p>
+
+  <h2>Education</h2>
+  <ul>
+    <li>Ingenieria Software UC3M</li>
+  </ul>
+
+  <h2>Achievements</h2>
+  <ul>
+    <li>Speaker at PyConES</li>
+  </ul>
+
+  <h2>Languages</h2>
+  <p class="inline">English (C1)</p>
+</body>
+</html>

@@ -1,6 +1,20 @@
 from pydantic import BaseModel, Field
 
 
+class Link(BaseModel):
+    label: str
+    url: str
+
+
+class Contact(BaseModel):
+    full_name: str | None = None
+    headline: str | None = None
+    email: str | None = None
+    phone: str | None = None
+    location: str | None = None
+    links: list[Link] = Field(default_factory=list)
+
+
 class Skill(BaseModel):
     name: str
     category: str | None = None
@@ -40,6 +54,7 @@ class Language(BaseModel):
 
 
 class ProfileData(BaseModel):
+    contact: Contact = Field(default_factory=Contact)
     skills: list[Skill] = Field(default_factory=list)
     experiences: list[Experience] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)

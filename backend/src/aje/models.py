@@ -21,6 +21,7 @@ class Base(DeclarativeBase):
 class Profile(Base):
     __tablename__ = "profile"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    contact: Mapped[dict] = mapped_column(JSON, default=dict)
     skills: Mapped[list] = mapped_column(JSON, default=list)
     experiences: Mapped[list] = mapped_column(JSON, default=list)
     education: Mapped[list] = mapped_column(JSON, default=list)
@@ -45,7 +46,21 @@ class CvProjection(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
     profile_id: Mapped[int] = mapped_column(ForeignKey("profile.id"))
     offer_id: Mapped[int | None] = mapped_column(ForeignKey("offers.id"), nullable=True)
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
     name: Mapped[str] = mapped_column(String(255))
+    content_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    suggestions: Mapped[list] = mapped_column(JSON, default=list)
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+
+class CoverLetter(Base):
+    __tablename__ = "cover_letters"
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    match_id: Mapped[int | None] = mapped_column(ForeignKey("matches.id"), nullable=True)
+    offer_id: Mapped[int | None] = mapped_column(ForeignKey("offers.id"), nullable=True)
+    profile_id: Mapped[int | None] = mapped_column(ForeignKey("profile.id"), nullable=True)
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)
     content_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
