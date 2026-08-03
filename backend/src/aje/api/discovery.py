@@ -4,10 +4,12 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from aje.api.profile import get_db_session
-from aje.discovery import graph as graph_mod
 from aje.discovery import manual as manual_mod
+from aje.discovery.estimate import estimate_run
+from aje.discovery.jobs import active_run_for_search, create_run, enqueue_run
+from aje.discovery.results import results_for_run
 from aje.discovery.scheduler import get_scheduler, remove_search_job, sync_search_job
-from aje.models import DiscoveryRun, Offer, SavedSearch
+from aje.models import DiscoveryRun, Match, Offer, SavedSearch
 
 router = APIRouter()
 
@@ -22,6 +24,13 @@ class SavedSearchIn(BaseModel):
 class OfferImportIn(BaseModel):
     text: str | None = None
     url: str | None = None
+
+
+class RunIn(BaseModel):
+    term: str
+    filters: dict = Field(default_factory=dict)
+    max_offers: int | None = None
+    saved_search_id: int | None = None
 
 
 def _search_out(search: SavedSearch) -> dict:
@@ -39,6 +48,9 @@ def _run_out(run: DiscoveryRun) -> dict:
     return {
         "id": run.id,
         "saved_search_id": run.saved_search_id,
+        "kind": run.kind,
+        "term": run.term,
+        "filters": run.filters or {},
         "status": run.status,
         "offers_found": run.offers_found,
         "offers_new": run.offers_new,
@@ -108,9 +120,85 @@ def delete_search(search_id: int, session: Session = Depends(get_db_session)) ->
 
 @router.post("/searches/{search_id}/run")
 def run_search(search_id: int, session: Session = Depends(get_db_session)) -> dict:
-    if session.get(SavedSearch, search_id) is None:
+    saved = session.get(SavedSearch, search_id)
+    if saved is None:
         raise HTTPException(status_code=404, detail="saved search not found")
-    return _run_out(graph_mod.run_saved_search(session, search_id))
+    if active_run_for_search(session, search_id) is not None:
+        raise HTTPException(status_code=409, detail="this search is already running")
+    run = create_run(
+        session,
+        term=saved.query,
+        filters=saved.filters or {},
+        kind="scheduled",
+        saved_search_id=saved.id,
+    )
+    enqueue_run(run.id)
+    return _run_out(run)
+
+
+@router.post("/runs")
+def create_manual_run(body: RunIn, session: Session = Depends(get_db_session)) -> dict:
+    if not body.term.strip():
+        raise HTTPException(status_code=400, detail="term is required")
+    run = create_run(
+        session,
+        term=body.term.strip(),
+        filters=body.filters,
+        kind="scheduled" if body.saved_search_id else "manual",
+        saved_search_id=body.saved_search_id,
+    )
+    enqueue_run(run.id, body.max_offers)
+    return _run_out(run)
+
+
+# Declared before /runs/{run_id}, or FastAPI matches "estimate" as a run id.
+@router.get("/runs/estimate")
+def run_estimate() -> dict:
+    return estimate_run().model_dump()
+
+
+@router.get("/runs/{run_id}/results")
+def run_results(run_id: int, session: Session = Depends(get_db_session)) -> list[dict]:
+    if session.get(DiscoveryRun, run_id) is None:
+        raise HTTPException(status_code=404, detail="run not found")
+
+    rows = results_for_run(session, run_id)
+    offer_ids = [r.offer_id for r in rows] or [0]
+    offers = {
+        o.id: o
+        for o in session.execute(select(Offer).where(Offer.id.in_(offer_ids))).scalars()
+    }
+    matches = {
+        m.offer_id: m
+        for m in session.execute(
+            select(Match).where(Match.offer_id.in_(offer_ids))
+        ).scalars()
+    }
+
+    def _match_out(offer_id: int) -> dict | None:
+        match = matches.get(offer_id)
+        if match is None:
+            return None
+        return {
+            "id": match.id,
+            "fitness": match.fitness,
+            "status": match.status,
+            "above_threshold": match.above_threshold,
+        }
+
+    return [
+        {
+            "id": r.id,
+            "offer_id": r.offer_id,
+            "offer": _offer_out(offers[r.offer_id]) if r.offer_id in offers else None,
+            "is_new": r.is_new,
+            "status": r.status,
+            "error": r.error,
+            "created_at": r.created_at.isoformat(),
+            "match": _match_out(r.offer_id),
+        }
+        for r in rows
+    ]
 
 
 @router.get("/runs")
