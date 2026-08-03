@@ -1,13 +1,10 @@
 """Pure text/keying helpers for embeddings. No DB, no network."""
-import hashlib
-
-from aje.discovery.normalize import normalize_text
 from aje.extraction.schema import ProfileData
+from aje.keys import achievement_key, experience_key, text_hash
 from aje.models import Offer
 
-
-def text_hash(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+# text_hash is re-exported: embed.py and test_scoring_texts.py import it from here
+__all__ = ["text_hash", "chunk_text", "profile_item_texts", "offer_item_texts"]
 
 
 def chunk_text(text: str, chunk_chars: int) -> list[str]:
@@ -35,10 +32,6 @@ def chunk_text(text: str, chunk_chars: int) -> list[str]:
     return chunks
 
 
-def _experience_key(company: str | None, title: str | None) -> str:
-    return f"experience:{normalize_text(company)}|{normalize_text(title)}"
-
-
 def _experience_text(exp: dict) -> str:
     parts = [
         exp.get("title") or "",
@@ -60,11 +53,11 @@ def profile_item_texts(profile: ProfileData) -> list[tuple[str, str]]:
     for experience in profile.experiences:
         exp = experience.model_dump()
         items.append(
-            (_experience_key(exp.get("company"), exp.get("title")), _experience_text(exp))
+            (experience_key(exp.get("company"), exp.get("title")), _experience_text(exp))
         )
     for achievement in profile.achievements:
         text = achievement.text
-        items.append((f"achievement:{text_hash(text)[:12]}", text))
+        items.append((achievement_key(text), text))
     return items
 
 
