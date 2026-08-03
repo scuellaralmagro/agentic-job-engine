@@ -148,6 +148,20 @@ def download(doc_id: int, session: Session = Depends(get_db_session)) -> FileRes
     return FileResponse(path, media_type="application/pdf", filename=path.name)
 
 
+@router.get("/generated-docs")
+def list_generated_docs(
+    kind: str | None = None,
+    limit: int = 50,
+    offset: int = 0,
+    session: Session = Depends(get_db_session),
+) -> list[dict]:
+    stmt = select(GeneratedDoc).order_by(GeneratedDoc.created_at.desc())
+    if kind is not None:
+        stmt = stmt.where(GeneratedDoc.kind == kind)
+    stmt = stmt.limit(limit).offset(offset)
+    return [_doc_out(d) for d in session.execute(stmt).scalars()]
+
+
 def _letter_out(letter: CoverLetter) -> dict:
     return {
         "id": letter.id,

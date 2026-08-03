@@ -14,7 +14,7 @@ from aje.api.profile import get_db_session
 from aje.app import create_app
 from aje.extraction.profile_service import save_profile
 from aje.extraction.schema import Contact, Experience, ProfileData, Skill
-from aje.models import Match, Offer
+from aje.models import CoverLetter, GeneratedDoc, Match, Offer
 
 EXP_KEY = "experience:acme|backend engineer"
 
@@ -227,3 +227,17 @@ def test_delete_removes_the_projection(session, match, fake_llm):
 
     assert client.delete(f"/projections/{created['id']}").status_code == 204
     assert client.get(f"/projections/{created['id']}").status_code == 404
+
+
+def test_generated_docs_lists_newest_first_and_filters_by_kind(session):
+    session.add(GeneratedDoc(kind="cv", pdf_ref="a.pdf"))
+    session.add(GeneratedDoc(kind="cover_letter", pdf_ref="b.pdf"))
+    session.commit()
+
+    client = _client(session)
+    body = client.get("/generated-docs").json()
+    assert {d["kind"] for d in body} == {"cv", "cover_letter"}
+
+    only_cv = client.get("/generated-docs", params={"kind": "cv"}).json()
+    assert [d["kind"] for d in only_cv] == ["cv"]
+    assert only_cv[0]["pdf_ref"] == "a.pdf"
