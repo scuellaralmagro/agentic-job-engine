@@ -41,15 +41,53 @@ export interface MatchOut {
 }
 
 // Discovery
+export type RunKind = "manual" | "scheduled";
+
 export interface RunOut {
   id: number;
   saved_search_id: number | null;
-  status: "ok" | "partial" | "failed";
+  kind: RunKind;
+  term: string | null;
+  filters: Record<string, unknown>;
+  status: "running" | "ok" | "partial" | "failed";
   offers_found: number;
   offers_new: number;
   source_results: unknown[];
   started_at: string;
   finished_at: string | null;
+}
+
+/** What the system did to an offer within one run. Distinct from the review
+ *  outcome on Match — "rejected by the prefilter" is not "rejected by you". */
+export type ResultStatus =
+  | "discovered"
+  | "scoring"
+  | "prefiltered"
+  | "scored"
+  | "failed";
+
+export interface ResultMatch {
+  id: number;
+  fitness: number;
+  status: MatchStatus;
+  above_threshold: boolean;
+}
+
+export interface DiscoveryResultOut {
+  id: number;
+  offer_id: number;
+  offer: OfferOut | null;
+  is_new: boolean;
+  status: ResultStatus;
+  error: string | null;
+  created_at: string;
+  match: ResultMatch | null;
+}
+
+export interface RunEstimate {
+  max_offers: number;
+  cost_per_offer_usd: number;
+  max_cost_usd: number;
 }
 
 export interface SearchOut {
