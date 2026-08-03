@@ -1,3 +1,4 @@
+from aje.extraction.normalize import ENGLISH_RULE
 from aje.extraction.schema import CandidateProfile
 from aje.llm.registry import llm_for
 
@@ -7,7 +8,8 @@ _SYSTEM = (
     "links such as LinkedIn or GitHub), skills, work "
     "experiences (with bullet points and the skills each used), education, "
     "achievements, and languages. Do not invent information that is not present. "
-    "Leave source_refs empty."
+    "Leave source_refs empty.\n"
+    + ENGLISH_RULE
 )
 
 

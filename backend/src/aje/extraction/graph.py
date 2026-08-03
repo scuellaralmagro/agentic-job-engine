@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from aje.extraction.cv import extract_cv
 from aje.extraction.linkedin import parse_linkedin_zip
 from aje.extraction.merge import merge_into_profile
+from aje.extraction.normalize import structure_linkedin
 from aje.extraction.profile_service import get_profile, save_profile
 from aje.extraction.schema import CandidateProfile, ProfileData
 from aje.extraction.storage import compute_hash, save_upload
@@ -53,6 +54,16 @@ def _parse_linkedin_node(state: ExtractionState) -> dict:
     return {"candidate": parse_linkedin_zip(Path(state["file_path"]))}
 
 
+def _structure_linkedin_node(state: ExtractionState) -> dict:
+    """Brings the mechanical CSV read up to the same shape the CV path produces.
+
+    parse_linkedin_zip only copies fields across, so without this the export
+    contributes one-blob bullets, no per-experience skills, and untranslated text.
+    The CV path skips this node — its extraction prompt already does both jobs.
+    """
+    return {"candidate": structure_linkedin(state["candidate"])}
+
+
 def _merge_node(state: ExtractionState) -> dict:
     merged = merge_into_profile(
         state["existing"], state["candidate"], state["source_id"]
@@ -65,6 +76,7 @@ def build_graph():
     g.add_node("detect_type", _detect_type)
     g.add_node("extract_cv", _extract_cv_node)
     g.add_node("parse_linkedin", _parse_linkedin_node)
+    g.add_node("structure_linkedin", _structure_linkedin_node)
     g.add_node("merge", _merge_node)
     g.set_entry_point("detect_type")
     g.add_conditional_edges(
@@ -73,7 +85,8 @@ def build_graph():
         {"cv": "extract_cv", "linkedin_export": "parse_linkedin"},
     )
     g.add_edge("extract_cv", "merge")
-    g.add_edge("parse_linkedin", "merge")
+    g.add_edge("parse_linkedin", "structure_linkedin")
+    g.add_edge("structure_linkedin", "merge")
     g.add_edge("merge", END)
     return g.compile()
 

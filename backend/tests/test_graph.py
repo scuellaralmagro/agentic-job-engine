@@ -6,8 +6,9 @@ import pytest
 from aje.extraction import cv as cv_mod
 from aje.extraction import graph as graph_mod
 from aje.extraction import merge as merge_mod
+from aje.extraction import normalize as normalize_mod
 from aje.extraction.profile_service import get_profile, list_source_documents
-from aje.extraction.schema import CandidateProfile, ProfileData, Skill
+from aje.extraction.schema import CandidateProfile, Experience, ProfileData, Skill
 from aje.extraction.text import UnsupportedFileType
 
 
@@ -33,7 +34,13 @@ def _make_linkedin_zip(path: Path) -> bytes:
     return path.read_bytes()
 
 
+def _stub_linkedin_structuring(monkeypatch, result: CandidateProfile) -> None:
+    """The LinkedIn path runs an LLM structuring pass before merge."""
+    monkeypatch.setattr(normalize_mod, "llm_for", lambda task: _FakeLLM(result))
+
+
 def test_run_extraction_linkedin_updates_profile(session, tmp_path, monkeypatch):
+    _stub_linkedin_structuring(monkeypatch, CandidateProfile(skills=[Skill(name="Python")]))
     # merge just returns the candidate as the merged profile
     monkeypatch.setattr(
         merge_mod,
@@ -52,6 +59,7 @@ def test_run_extraction_linkedin_updates_profile(session, tmp_path, monkeypatch)
 
 
 def test_run_extraction_dedups_duplicate_upload(session, tmp_path, monkeypatch):
+    _stub_linkedin_structuring(monkeypatch, CandidateProfile(skills=[Skill(name="Go")]))
     monkeypatch.setattr(
         merge_mod, "llm_for", lambda task: _FakeLLM(ProfileData(skills=[Skill(name="Go")]))
     )
@@ -89,3 +97,58 @@ def test_run_extraction_failure_marks_failed_and_preserves_profile(
     docs = list_source_documents(session)
     assert len(docs) == 1 and docs[0].status == "failed"
     assert "llm down" in docs[0].parsed_json["error"]
+
+
+def test_linkedin_export_is_structured_by_an_llm_before_merge(
+    session, tmp_path, monkeypatch
+):
+    """The CSV read is mechanical; the LLM pass is what makes it CV-shaped."""
+    seen: dict = {}
+
+    class _CapturingStructured:
+        def invoke(self, messages):
+            seen["human"] = messages[-1][1]
+            seen["system"] = messages[0][1]
+            return CandidateProfile(
+                experiences=[
+                    Experience(
+                        company="Acme",
+                        title="Backend Engineer",
+                        bullets=["Built the billing API", "Led the migration"],
+                        skills=["Python"],
+                    )
+                ]
+            )
+
+    class _CapturingLLM:
+        def with_structured_output(self, schema):
+            return _CapturingStructured()
+
+    monkeypatch.setattr(normalize_mod, "llm_for", lambda task: _CapturingLLM())
+    monkeypatch.setattr(
+        merge_mod,
+        "llm_for",
+        lambda task: _FakeLLM(ProfileData(skills=[Skill(name="Python")])),
+    )
+
+    zip_path = tmp_path / "in.zip"
+    with zipfile.ZipFile(zip_path, "w") as zf:
+        zf.writestr(
+            "Positions.csv",
+            "Company Name,Title,Description,Started On,Finished On\n"
+            "Acme,Ingeniero Backend,Construi la API de facturacion,2020,2023\n",
+        )
+
+    graph_mod.run_extraction(session, zip_path.read_bytes(), "linkedin.zip")
+
+    # the raw CSV values reached the model
+    assert "Ingeniero Backend" in seen["human"]
+    assert "English" in seen["system"]
+    # and its structured output is what gets persisted, not the raw parse
+    docs = list_source_documents(session)
+    assert docs[0].parsed_json["experiences"][0]["title"] == "Backend Engineer"
+    assert len(docs[0].parsed_json["experiences"][0]["bullets"]) == 2
+
+
+def test_cv_prompt_demands_english():
+    assert "English" in cv_mod._SYSTEM
