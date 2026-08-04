@@ -90,6 +90,60 @@ def test_a_letter_claiming_an_absent_skill_is_rejected(session, profile, match, 
     assert session.query(CoverLetter).count() == 0
 
 
+def test_anchor_tokens_never_reach_the_letter(session, profile, match, monkeypatch):
+    """Shown the keyed profile, a real model cited the keys inline and they
+    rendered into the PDF that goes to an employer. The context no longer offers
+    them, but the model is stochastic, so the prose is stripped as well."""
+    leaked = _content(
+        paragraphs=[
+            "I built billing APIs [experience:acme|backend engineer#bullet:0] in Python.",
+            "My strongest skill is Python [skill:python].",
+        ]
+    )
+    monkeypatch.setattr(letter_mod, "llm_for", lambda task: _CountingLLM(leaked))
+
+    letter = letter_mod.write_cover_letter(session, match.id, config=CvConfig())
+
+    assert letter.content_json["paragraphs"] == [
+        "I built billing APIs in Python.",
+        "My strongest skill is Python.",
+    ]
+
+
+def test_a_salutation_repeated_as_the_first_paragraph_is_dropped(
+    session, profile, match, monkeypatch
+):
+    """The template prints the salutation and then every paragraph, so a model
+    that opens its prose with the greeting renders it twice in the employer's PDF."""
+    repeated = _content(
+        paragraphs=[
+            "Dear hiring team,",
+            "I have built billing APIs in Python for three years.",
+        ]
+    )
+    monkeypatch.setattr(letter_mod, "llm_for", lambda task: _CountingLLM(repeated))
+
+    letter = letter_mod.write_cover_letter(session, match.id, config=CvConfig())
+
+    assert letter.content_json["salutation"] == "Dear hiring team,"
+    assert letter.content_json["paragraphs"] == [
+        "I have built billing APIs in Python for three years."
+    ]
+
+
+def test_a_paragraph_merely_resembling_the_salutation_survives(
+    session, profile, match, monkeypatch
+):
+    kept = _content(
+        paragraphs=["Dear hiring team, I have built billing APIs in Python."]
+    )
+    monkeypatch.setattr(letter_mod, "llm_for", lambda task: _CountingLLM(kept))
+
+    letter = letter_mod.write_cover_letter(session, match.id, config=CvConfig())
+
+    assert len(letter.content_json["paragraphs"]) == 1
+
+
 def test_the_language_override_wins(session, profile, match, monkeypatch):
     monkeypatch.setattr(letter_mod, "llm_for", lambda task: _CountingLLM(_content()))
 

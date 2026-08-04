@@ -80,6 +80,18 @@ def test_context_carries_the_offer_the_assessment_and_the_profile():
     assert "[skill:python]" in context
 
 
+def test_the_cover_letter_context_offers_no_keys_to_cite():
+    """Letter paragraphs render verbatim, so a cited key would reach the employer."""
+    context = build_context(_offer(), _match(), _profile(), cite_keys=False)
+
+    assert "[skill:python]" not in context
+    assert "cite these keys" not in context
+    # the profile itself is still there, just without the anchors
+    assert "Cut p99 latency" in context
+    assert "Backend Engineer" in context
+    assert "English (C1)" in context
+
+
 def test_notes_are_included_only_when_given():
     with_notes = build_context(_offer(), _match(), _profile(), notes="Stress the fintech bit")
     without = build_context(_offer(), _match(), _profile())

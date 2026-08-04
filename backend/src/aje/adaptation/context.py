@@ -12,38 +12,52 @@ from aje.keys import (
 from aje.models import Match, Offer
 
 
-def render_profile_with_keys(profile: ProfileData) -> str:
-    """The profile, with each item's anchor key in brackets beside it."""
+def render_profile(profile: ProfileData, *, with_keys: bool = True) -> str:
+    """The profile as prompt text, optionally with each item's anchor key beside it.
+
+    Anchoring only helps a consumer that resolves keys back to text. The cover
+    letter does not — its paragraphs render verbatim — so it asks for the plain
+    form rather than tempting the model to cite a key into the prose.
+    """
+
+    def tag(key: str) -> str:
+        return f"[{key}] " if with_keys else ""
+
     lines: list[str] = ["SKILLS:"]
     for skill in profile.skills:
-        lines.append(f"  [{skill_key(skill.name)}] {skill.name}")
+        lines.append(f"  {tag(skill_key(skill.name))}{skill.name}")
 
     lines.append("EXPERIENCES:")
     for exp in profile.experiences:
         exp_key = experience_key(exp.company, exp.title)
         period = " - ".join(p for p in (exp.start, exp.end) if p)
-        header = f"  [{exp_key}] {exp.title} @ {exp.company}"
+        header = f"  {tag(exp_key)}{exp.title} @ {exp.company}"
         lines.append(f"{header} ({period})" if period else header)
         if exp.description:
-            lines.append(f"    [{description_key(exp_key)}] {exp.description}")
+            lines.append(f"    {tag(description_key(exp_key))}{exp.description}")
         for index, bullet in enumerate(exp.bullets):
-            lines.append(f"    [{bullet_key(exp_key, index)}] {bullet}")
+            lines.append(f"    {tag(bullet_key(exp_key, index))}{bullet}")
 
     lines.append("ACHIEVEMENTS:")
     for achievement in profile.achievements:
-        lines.append(f"  [{achievement_key(achievement.text)}] {achievement.text}")
+        lines.append(f"  {tag(achievement_key(achievement.text))}{achievement.text}")
 
     lines.append("EDUCATION:")
     for edu in profile.education:
         label = " ".join(p for p in (edu.degree, edu.field, edu.institution) if p)
-        lines.append(f"  [{education_key(edu.institution, edu.degree)}] {label}")
+        lines.append(f"  {tag(education_key(edu.institution, edu.degree))}{label}")
 
     lines.append("LANGUAGES:")
     for language in profile.languages:
         label = f"{language.name} ({language.level})" if language.level else language.name
-        lines.append(f"  [{language_key(language.name)}] {label}")
+        lines.append(f"  {tag(language_key(language.name))}{label}")
 
     return "\n".join(lines)
+
+
+def render_profile_with_keys(profile: ProfileData) -> str:
+    """The profile, with each item's anchor key in brackets beside it."""
+    return render_profile(profile, with_keys=True)
 
 
 def render_match(match: Match) -> str:
@@ -58,9 +72,19 @@ def render_match(match: Match) -> str:
 
 
 def build_context(
-    offer: Offer, match: Match, profile: ProfileData, *, notes: str | None = None
+    offer: Offer,
+    match: Match,
+    profile: ProfileData,
+    *,
+    notes: str | None = None,
+    cite_keys: bool = True,
 ) -> str:
     header = " | ".join(p for p in (offer.title, offer.company, offer.location) if p)
+    profile_heading = (
+        "=== CANDIDATE PROFILE (cite these keys verbatim) ==="
+        if cite_keys
+        else "=== CANDIDATE PROFILE ==="
+    )
     parts = [
         "=== JOB OFFER ===",
         header,
@@ -69,8 +93,8 @@ def build_context(
         "=== SCORING ASSESSMENT ===",
         render_match(match),
         "",
-        "=== CANDIDATE PROFILE (cite these keys verbatim) ===",
-        render_profile_with_keys(profile),
+        profile_heading,
+        render_profile(profile, with_keys=cite_keys),
     ]
     if notes:
         parts += ["", "=== USER NOTES ===", notes]
