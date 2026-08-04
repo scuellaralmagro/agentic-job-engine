@@ -1,6 +1,7 @@
 from datetime import datetime
 
-from aje.discovery.normalize import compute_offer_hash, normalize_text, to_offer
+from aje.discovery.normalize import compute_offer_hash, to_offer
+from aje.textnorm import normalize_text
 from aje.discovery.schema import RawOffer
 
 

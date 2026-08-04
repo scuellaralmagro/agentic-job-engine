@@ -19,9 +19,21 @@ class _StubAdapter:
         return self._offers
 
 
-def _raw(title, company="Acme", location="Madrid", source="stub", url="https://x/1"):
+def _raw(
+    title,
+    company="Acme",
+    location="Madrid",
+    source="stub",
+    url="https://x/1",
+    description=None,
+):
     return RawOffer(
-        title=title, company=company, location=location, source=source, url=url
+        title=title,
+        company=company,
+        location=location,
+        source=source,
+        url=url,
+        description=description,
     )
 
 
@@ -131,6 +143,48 @@ def test_filter_applies_locations_and_exclude_keywords(session):
     titles = [o.title for o in session.query(Offer).all()]
     assert titles == ["Backend Dev"]
     assert run.offers_new == 1
+
+
+def test_the_work_mode_filter_keeps_matching_and_unstated_offers(session):
+    """An undetected mode is missing information, not a mismatch: most Spanish
+    postings never state it, and dropping them would hide real matches."""
+    adapter = _StubAdapter(
+        "stub",
+        [
+            _raw("Remote Dev", url="https://x/1", description="100% remoto"),
+            _raw("Office Dev", url="https://x/2", description="Puesto presencial"),
+            _raw("Split Dev", url="https://x/3", description="Modelo hibrido"),
+            _raw("Quiet Dev", url="https://x/4", description="Buscamos backend"),
+        ],
+    )
+    run = graph_mod.run_discovery(
+        session,
+        term="python",
+        adapters=[adapter],
+        filters={"work_mode": ["remote", "hybrid"]},
+        score=False,
+    )
+
+    stored = {o.title: o.work_mode for o in session.query(Offer).all()}
+    assert stored == {
+        "Remote Dev": "remote",
+        "Split Dev": "hybrid",
+        "Quiet Dev": None,
+    }
+    assert run.offers_new == 3
+
+
+def test_no_work_mode_filter_keeps_everything(session):
+    adapter = _StubAdapter(
+        "stub",
+        [
+            _raw("Remote Dev", url="https://x/1", description="100% remoto"),
+            _raw("Office Dev", url="https://x/2", description="Puesto presencial"),
+        ],
+    )
+    graph_mod.run_discovery(session, term="python", adapters=[adapter], score=False)
+
+    assert session.query(Offer).count() == 2
 
 
 def test_run_saved_search_uses_stored_query_and_links_run(session, monkeypatch):

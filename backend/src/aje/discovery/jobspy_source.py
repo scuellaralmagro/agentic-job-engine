@@ -16,6 +16,21 @@ def _clean(value: object) -> str | None:
     return text or None
 
 
+def _to_bool(value: object) -> bool | None:
+    """Missing cells arrive as NaN, which is truthy; only a real bool counts."""
+    if isinstance(value, bool):
+        return value
+    if value is None or isinstance(value, float):  # NaN
+        return None
+    if isinstance(value, str):
+        text = value.strip().lower()
+        if text in {"true", "yes", "1"}:
+            return True
+        if text in {"false", "no", "0"}:
+            return False
+    return None
+
+
 def _to_datetime(value: object) -> datetime | None:
     if isinstance(value, datetime):
         return value
@@ -69,4 +84,5 @@ class JobSpyAdapter:
             url=_clean(row.get("job_url")),
             source=f"{self.name}:{site}",
             posted_at=_to_datetime(row.get("date_posted")),
+            is_remote=_to_bool(row.get("is_remote")),
         )

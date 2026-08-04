@@ -16,6 +16,8 @@ function makeMatch(overrides: Partial<MatchOut> = {}): MatchOut {
       company: "Acme",
       location: "Madrid",
       seniority: "senior",
+      // Most real postings never state it; the row must cope with null.
+      work_mode: null,
       skills: ["python"],
       description: "desc",
       url: null,

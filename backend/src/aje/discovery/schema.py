@@ -22,6 +22,9 @@ class RawOffer(BaseModel):
     url: str | None = None
     source: str
     posted_at: datetime | None = None
+    # The board's own remote checkbox, where it offers one. Weaker evidence than
+    # the posting text; see discovery.work_mode.
+    is_remote: bool | None = None
 
 
 class SourceResult(BaseModel):

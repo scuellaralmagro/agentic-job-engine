@@ -72,6 +72,8 @@ class Offer(Base):
     company: Mapped[str | None] = mapped_column(String(512), nullable=True)
     location: Mapped[str | None] = mapped_column(String(255), nullable=True)
     seniority: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # remote | hybrid | onsite | NULL when the posting never says
+    work_mode: Mapped[str | None] = mapped_column(String(16), nullable=True)
     skills: Mapped[list] = mapped_column(JSON, default=list)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     source: Mapped[str] = mapped_column(String(64))

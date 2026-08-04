@@ -8,6 +8,7 @@ import { useSetStatus } from "@/features/queue/queries";
 import { AdaptActions } from "./AdaptActions";
 import { FitnessPanel } from "./FitnessPanel";
 import { useMatch } from "./queries";
+import { workModeLabel } from "@/lib/workMode";
 
 export function MatchDetailPage() {
   const { id } = useParams();
@@ -50,7 +51,12 @@ export function MatchDetailPage() {
             )}
           </div>
           <p className="text-sm text-ink-dim">
-            {[offer?.company, offer?.location, offer?.seniority]
+            {[
+              offer?.company,
+              offer?.location,
+              offer?.seniority,
+              workModeLabel(offer?.work_mode),
+            ]
               .filter(Boolean)
               .join(" · ")}
           </p>

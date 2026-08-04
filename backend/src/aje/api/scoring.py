@@ -28,6 +28,7 @@ def _offer_out(offer: Offer | None) -> dict | None:
         "company": offer.company,
         "location": offer.location,
         "seniority": offer.seniority,
+        "work_mode": offer.work_mode,
         "skills": offer.skills,
         "description": offer.description,
         "url": offer.url,

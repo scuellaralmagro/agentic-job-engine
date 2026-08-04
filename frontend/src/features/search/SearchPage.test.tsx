@@ -71,6 +71,48 @@ test("launching creates a run and does not claim it finished", async () => {
   await waitFor(() => expect(posted).toMatchObject({ term: "python madrid" }));
 });
 
+test("the selected work modes go into the run's filters", async () => {
+  mockBase();
+  let posted: unknown = null;
+  server.use(
+    http.post("/api/runs", async ({ request }) => {
+      posted = await request.json();
+      return HttpResponse.json({
+        id: 9,
+        saved_search_id: null,
+        kind: "manual",
+        term: "python",
+        filters: {},
+        status: "running",
+        offers_found: 0,
+        offers_new: 0,
+        source_results: [],
+        started_at: "2026-08-03T10:00:00",
+        finished_at: null,
+      });
+    }),
+  );
+  renderWithProviders(<SearchPage />);
+
+  await userEvent.type(screen.getByLabelText(/search query/i), "python");
+  await userEvent.click(screen.getByRole("button", { name: "Remote" }));
+  await userEvent.click(screen.getByRole("button", { name: "Hybrid" }));
+
+  expect(
+    screen.getByText(/offers that don't state a mode are still included/i),
+  ).toBeInTheDocument();
+
+  await userEvent.click(screen.getByRole("button", { name: /^run search$/i }));
+  await userEvent.click(await screen.findByRole("button", { name: /start run/i }));
+
+  await waitFor(() =>
+    expect(posted).toMatchObject({
+      term: "python",
+      filters: { work_mode: ["remote", "hybrid"] },
+    }),
+  );
+});
+
 test("run history shows both kinds with their query", async () => {
   mockBase([
     {

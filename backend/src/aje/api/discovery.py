@@ -67,6 +67,7 @@ def _offer_out(offer: Offer) -> dict:
         "company": offer.company,
         "location": offer.location,
         "seniority": offer.seniority,
+        "work_mode": offer.work_mode,
         "skills": offer.skills,
         "description": offer.description,
         "source": offer.source,

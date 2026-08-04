@@ -14,6 +14,7 @@ const match: MatchOut = {
     company: "Acme",
     location: "Madrid",
     seniority: "senior",
+    work_mode: "hybrid",
     skills: ["python", "fastapi"],
     description: "Build APIs all day.",
     url: "https://example.com/job",
@@ -54,4 +55,5 @@ test("renders offer, rubric bars, gaps and explanation", async () => {
   expect(screen.getByText(/kubernetes/i)).toBeInTheDocument();
   expect(screen.getByText("Strong overlap on core stack.")).toBeInTheDocument();
   expect(screen.getByTestId("fitness-dial")).toHaveTextContent("82%");
+  expect(screen.getByText(/Acme · Madrid · senior · Hybrid/)).toBeInTheDocument();
 });

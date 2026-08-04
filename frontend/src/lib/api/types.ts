@@ -1,10 +1,15 @@
 // Offers & matches
+
+/** null when the posting never states the arrangement — most of them do not. */
+export type WorkMode = "remote" | "hybrid" | "onsite";
+
 export interface OfferOut {
   id: number;
   title: string;
   company: string | null;
   location: string | null;
   seniority: string | null;
+  work_mode: WorkMode | null;
   skills: string[];
   description: string | null;
   url: string | null;

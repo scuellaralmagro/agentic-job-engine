@@ -1,5 +1,23 @@
 # TODO
 
+## Agreed queue (2026-08-04)
+
+In order. Work mode is done; the rest are next.
+
+1. ~~Work mode detection + search selection~~ — done
+2. **Scoring prompt cache reorder** — the prompt puts volatile content first so
+   nothing caches. Reordering makes input ~90% cheaper on the highest-volume call,
+   and scoring is ~75% of spend. Biggest cost win for the smallest change.
+3. **Salary extraction + filter** — JobSpy returns min/max salary and
+   `_to_raw_offer` discards it, exactly as it did `is_remote`. Same shape as work
+   mode, so it follows cheaply.
+4. **Fix cross-source dedup** — `compute_offer_hash` uses the raw location, so the
+   same job on Indeed ("Madrid, MD, ES") and Tecnoempleo ("Madrid") is stored and
+   scored twice. Normalizing location into the hash cuts duplicate spend.
+5. **Application tracking** — the queue stops at `accepted`; there is no applied
+   date, response or interview state. The CV and cover letter already hang off the
+   match, so this is where they belong.
+
 ## Scheduled runs have no spend cap
 
 **Found:** 2026-08-04, verifying the scheduled discovery path for the first time.

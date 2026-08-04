@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { FitnessBadge } from "@/components/FitnessBadge";
 import { cn } from "@/lib/utils";
 import type { MatchOut } from "@/lib/api/types";
+import { workModeLabel } from "@/lib/workMode";
 
 export function QueueRow({
   match,
@@ -36,7 +37,9 @@ export function QueueRow({
           {offer?.title ?? `Offer #${match.offer_id}`}
         </Link>
         <p className="truncate text-sm text-ink-dim">
-          {[offer?.company, offer?.location].filter(Boolean).join(" · ")}
+          {[offer?.company, offer?.location, workModeLabel(offer?.work_mode)]
+            .filter(Boolean)
+            .join(" · ")}
         </p>
       </div>
       <div className="hidden items-center gap-1.5 lg:flex">

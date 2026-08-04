@@ -6,7 +6,7 @@ output only — never to a projection the user has edited by hand.
 import re
 
 from aje.adaptation.schema import TailoredCv
-from aje.discovery.normalize import normalize_text
+from aje.textnorm import normalize_text
 from aje.extraction.schema import ProfileData
 from aje.keys import experience_key, profile_keys
 

@@ -11,7 +11,8 @@ from aje.config import get_settings
 from aje.discovery import results as results_mod
 from aje.discovery.config import get_sources_config
 from aje.discovery.expand import expand_query
-from aje.discovery.normalize import normalize_text, to_offer
+from aje.discovery.normalize import to_offer
+from aje.textnorm import normalize_text
 from aje.discovery.registry import build_adapters
 from aje.discovery.schema import RawOffer, SearchQuery, SourceResult
 from aje.models import DiscoveryRun, Offer, SavedSearch
@@ -35,13 +36,26 @@ class DiscoveryState(TypedDict, total=False):
     kept: list[Offer]
 
 
+def _remote_hint(state: DiscoveryState) -> bool | None:
+    """Boards understand "remote only"; none of them understand "hybrid".
+
+    Narrowing the upstream search is only safe when remote is the sole mode
+    asked for — otherwise the board would withhold the hybrid and on-site
+    postings the filter is meant to let through.
+    """
+    modes = (state.get("filters") or {}).get("work_mode") or []
+    if modes:
+        return True if list(modes) == ["remote"] else None
+    return state.get("remote")
+
+
 def _expand_node(state: DiscoveryState) -> dict:
     terms = expand_query(state["term"])
     return {
         "query": SearchQuery(
             terms=terms,
             location=state.get("location"),
-            remote=state.get("remote"),
+            remote=_remote_hint(state),
         )
     }
 
@@ -88,10 +102,15 @@ def _coarse_filter_node(state: DiscoveryState) -> dict:
     filters = state.get("filters") or {}
     locations = [normalize_text(loc) for loc in filters.get("locations") or []]
     excluded = [normalize_text(kw) for kw in filters.get("exclude_keywords") or []]
+    work_modes = [normalize_text(m) for m in filters.get("work_mode") or []]
 
     kept: list[Offer] = []
     for offer in state["offers"]:
         if not offer.title or not offer.url:
+            continue
+        # An undetected mode is missing information, not a mismatch — dropping
+        # it would silently discard the many postings that never say.
+        if work_modes and offer.work_mode and offer.work_mode not in work_modes:
             continue
         if locations:
             offer_location = normalize_text(offer.location)

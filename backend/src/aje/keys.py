@@ -7,7 +7,7 @@ only this one.
 """
 import hashlib
 
-from aje.discovery.normalize import normalize_text
+from aje.textnorm import normalize_text
 from aje.extraction.schema import ProfileData
 
 

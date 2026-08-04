@@ -11,6 +11,8 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { GlassPanel } from "@/components/GlassPanel";
+import { WorkModeSelect } from "./WorkModeSelect";
+import type { WorkMode } from "@/lib/api/types";
 import { useCreateRun, useEstimate } from "./queries";
 
 export function RunSearchCard() {
@@ -19,7 +21,7 @@ export function RunSearchCard() {
   const createRun = useCreateRun();
   const [term, setTerm] = useState("");
   const [location, setLocation] = useState("");
-  const [remote, setRemote] = useState(false);
+  const [workMode, setWorkMode] = useState<WorkMode[]>([]);
   const [cap, setCap] = useState("");
   const [confirming, setConfirming] = useState(false);
 
@@ -35,7 +37,7 @@ export function RunSearchCard() {
         term: term.trim(),
         filters: {
           ...(location.trim() ? { location: location.trim() } : {}),
-          ...(remote ? { remote: true } : {}),
+          ...(workMode.length ? { work_mode: workMode } : {}),
         },
         ...(cap.trim() ? { max_offers: Number(cap) } : {}),
       },
@@ -72,14 +74,7 @@ export function RunSearchCard() {
             onChange={(e) => setLocation(e.target.value)}
           />
         </div>
-        <label className="flex items-center gap-2 pb-2 text-sm">
-          <input
-            type="checkbox"
-            checked={remote}
-            onChange={(e) => setRemote(e.target.checked)}
-          />
-          Remote
-        </label>
+        <WorkModeSelect value={workMode} onChange={setWorkMode} />
         <div>
           <Label htmlFor="cap">Max offers to score</Label>
           <Input
@@ -94,6 +89,12 @@ export function RunSearchCard() {
           <Search className="size-4" /> Run search
         </Button>
       </div>
+      {workMode.length > 0 && (
+        <p className="text-xs text-ink-dim">
+          Offers that don't state a mode are still included — most postings never
+          say.
+        </p>
+      )}
 
       <Dialog open={confirming} onOpenChange={setConfirming}>
         <DialogContent className="glass-elevated">
