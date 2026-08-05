@@ -5,14 +5,24 @@
 In order. Work mode is done; the rest are next.
 
 1. ~~Work mode detection + search selection~~ — done
-2. ~~Scoring prompt cache reorder~~ — done. The prompt is now system → whole
-   profile → offer, giving a 1302-token prefix that is byte-identical across all
-   248 stored offers (~65% of mean input). Note the reorder alone was not enough:
-   system + skills/languages/education is only 615 tokens, under OpenAI's 1024
-   minimum, so the per-offer profile-item *selection* had to go too. It was inert
-   anyway — 3 profile items against `top_k: 8` meant all 3 were always sent. **If
-   the profile ever grows past `top_k` items, revisit:** reintroduce selection
-   per-profile, never per-offer, or the prefix stops caching.
+2. ~~Scoring prompt cache reorder~~ — done, but **it does not pay off yet.** The
+   prompt is now system → whole profile → offer, a 1302-token prefix that is
+   byte-identical across all 248 stored offers. Verified live, and the premise of
+   the whole item turned out to be wrong: **this provider does not do prefix
+   caching.** A byte-identical repeat cached 2690/2693 tokens, but two offers
+   sharing the 1302-token prefix cached 0, even 90s apart. Scoring sends a
+   different offer every call, so nothing caches in practice. The usage payload
+   carries `cache_creation` / `cache_write_tokens` — Anthropic-style *explicit*
+   breakpoint accounting — so the missing piece is likely a cache breakpoint that
+   `ChatOpenAI` never emits. See "Prompt caching is not actually on" below.
+
+   The reorder is kept because it costs nothing (identical content, identical
+   token count) and is the shape prefix caching needs. Note the reorder alone was
+   never enough: system + skills/languages/education is only 615 tokens, under the
+   1024 minimum, so the per-offer profile-item *selection* had to go too. It was
+   inert anyway — 3 profile items against `top_k: 8` meant all 3 were always sent.
+   **If the profile ever grows past `top_k` items, revisit:** reintroduce
+   selection per-profile, never per-offer, or the prefix stops being stable.
 3. **Salary extraction + filter** — JobSpy returns min/max salary and
    `_to_raw_offer` discards it, exactly as it did `is_remote`. Same shape as work
    mode, so it follows cheaply.
@@ -22,6 +32,36 @@ In order. Work mode is done; the rest are next.
 5. **Application tracking** — the queue stops at `accepted`; there is no applied
    date, response or interview state. The CV and cover letter already hang off the
    match, so this is where they belong.
+
+## Prompt caching is not actually on
+
+**Found:** 2026-08-05, verifying the cache reorder against the live API.
+
+Measured, 14 real scoring calls:
+
+| case | input | cached |
+|---|---|---|
+| byte-identical prompt, repeated | 2693 | 2690 (~100%) |
+| two offers sharing a 1302-token prefix, back to back | ~2500 | 0 |
+| same, 90s apart to rule out population lag | ~2400 | 0 |
+
+So caching exists and is reported, but only on an exact whole-prompt match, which
+scoring never produces — it sends a different offer every call. The reorder is
+therefore correct but currently worth $0.
+
+Worth trying, cheapest first:
+
+- Pass OpenAI's `prompt_cache_key` through `models.yaml → params` (the registry
+  already splats `params` into `ChatOpenAI`), and re-run the check.
+- The usage payload's `cache_creation` / `cache_write_tokens` fields are
+  Anthropic-shaped, so this may be a gateway wanting an explicit `cache_control`
+  breakpoint on the profile block. `ChatOpenAI` will not emit one.
+- Confirm with the provider whether `gpt-5.6-terra` does automatic prefix caching
+  at all, and what its minimum prefix is.
+
+Re-run `scratchpad/latency_check.py`-style A/B after any change — the check is two
+calls and settles it in 90 seconds. Do not trust a token count as evidence of a
+cache hit; read `usage_metadata.input_token_details.cache_read` back from the API.
 
 ## Scheduled runs have no spend cap
 

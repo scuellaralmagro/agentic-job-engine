@@ -16,10 +16,12 @@ queue:
   threshold: 60
 
 estimate:
-  # gpt-5.6-terra rubric call. Measured over the 248 stored offers: ~1970 input
-  # (mean) + ~500 output. Of that input, a 1302-token prefix — system + the whole
-  # profile — is identical on every call and served from the prompt cache, so ~65%
-  # of input bills at the cached rate. This figure is deliberately NOT discounted
-  # for that: it stays a conservative ceiling, and the first call of any run is a
-  # genuine cache miss.
+  # gpt-5.6-terra rubric call: ~2.3-2.8k input + ~500-900 output, measured live.
+  #
+  # NOT discounted for prompt caching, because measurement says there is none to
+  # claim. The prompt is built stable-prefix-first (see scoring/rubric.py) and that
+  # prefix is byte-identical across all 248 stored offers, but this provider only
+  # cached a byte-identical *whole* prompt (2690/2693 tokens on a repeat). Two
+  # offers sharing a 1302-token prefix cached 0, even 90s apart. Real scoring sends
+  # a different offer every call, so in practice nothing caches today.
   cost_per_offer_usd: 0.011
