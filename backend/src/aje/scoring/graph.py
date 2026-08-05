@@ -26,18 +26,16 @@ class ScoringState(TypedDict, total=False):
     profile: ProfileData
     config: ScoringConfig
     similarity: float
-    item_keys: list[str]
     gated: bool
     outcome: str  # "scored" | "gated"
 
 
 def _prefilter_node(state: ScoringState) -> dict:
     result = prefilter_offer(state["session"], state["offer"], state["config"].prefilter)
-    return {
-        "similarity": result.similarity,
-        "item_keys": result.item_keys,
-        "gated": result.gated,
-    }
+    # result.item_keys is deliberately not threaded on: the rubric sends the whole
+    # profile so its prompt prefix stays cacheable. The prefilter still ranks items
+    # because that ranking is what the gating similarity is averaged from.
+    return {"similarity": result.similarity, "gated": result.gated}
 
 
 def _gate(state: ScoringState) -> str:
@@ -46,7 +44,7 @@ def _gate(state: ScoringState) -> str:
 
 def _rubric_node(state: ScoringState) -> dict:
     session, offer, config = state["session"], state["offer"], state["config"]
-    rubric = score_with_rubric(offer, state["profile"], state["item_keys"])
+    rubric = score_with_rubric(offer, state["profile"])
     fitness = compute_fitness(rubric, config.weights)
     upsert_rubric_match(
         session,

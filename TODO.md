@@ -5,9 +5,14 @@
 In order. Work mode is done; the rest are next.
 
 1. ~~Work mode detection + search selection~~ — done
-2. **Scoring prompt cache reorder** — the prompt puts volatile content first so
-   nothing caches. Reordering makes input ~90% cheaper on the highest-volume call,
-   and scoring is ~75% of spend. Biggest cost win for the smallest change.
+2. ~~Scoring prompt cache reorder~~ — done. The prompt is now system → whole
+   profile → offer, giving a 1302-token prefix that is byte-identical across all
+   248 stored offers (~65% of mean input). Note the reorder alone was not enough:
+   system + skills/languages/education is only 615 tokens, under OpenAI's 1024
+   minimum, so the per-offer profile-item *selection* had to go too. It was inert
+   anyway — 3 profile items against `top_k: 8` meant all 3 were always sent. **If
+   the profile ever grows past `top_k` items, revisit:** reintroduce selection
+   per-profile, never per-offer, or the prefix stops caching.
 3. **Salary extraction + filter** — JobSpy returns min/max salary and
    `_to_raw_offer` discards it, exactly as it did `is_remote`. Same shape as work
    mode, so it follows cheaply.

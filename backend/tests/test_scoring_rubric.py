@@ -69,38 +69,70 @@ def test_returns_the_structured_rubric(monkeypatch):
     fake = _FakeLLM(_result())
     monkeypatch.setattr(rubric_mod, "llm_for", lambda task: fake)
 
-    result = rubric_mod.score_with_rubric(
-        _offer(), _profile(), ["experience:acme|backend engineer"]
-    )
+    result = rubric_mod.score_with_rubric(_offer(), _profile())
 
     assert result.skills.score == 80
     assert result.requirements.seniority == "senior"
     assert fake.structured.calls == 1
 
 
-def test_prompt_contains_the_offer_the_skills_and_the_retrieved_items(monkeypatch):
+def test_prompt_contains_the_offer_the_skills_and_the_experience(monkeypatch):
     fake = _FakeLLM(_result())
     monkeypatch.setattr(rubric_mod, "llm_for", lambda task: fake)
 
-    rubric_mod.score_with_rubric(_offer(), _profile(), ["experience:acme|backend engineer"])
+    rubric_mod.score_with_rubric(_offer(), _profile())
 
     human = fake.structured.last_messages[-1][1]
     assert "Senior Backend Engineer" in human
     assert "Python" in human  # full skill list, sent verbatim
     assert "English" in human  # full language list, sent verbatim
-    assert "Backend Engineer" in human  # the retrieved experience
+    assert "Backend Engineer" in human  # the experience
 
 
-def test_only_the_retrieved_experiences_are_included(monkeypatch):
+def test_every_experience_is_included(monkeypatch):
+    """The profile block is complete, not a per-offer selection — see the prefix test."""
     fake = _FakeLLM(_result())
     monkeypatch.setattr(rubric_mod, "llm_for", lambda task: fake)
     profile = _profile()
     profile.experiences.append(Experience(company="Globex", title="Frontend Dev"))
 
-    rubric_mod.score_with_rubric(_offer(), profile, ["experience:acme|backend engineer"])
+    rubric_mod.score_with_rubric(_offer(), profile)
 
     human = fake.structured.last_messages[-1][1]
-    assert "Globex" not in human
+    assert "Globex" in human
+
+
+def test_the_profile_precedes_the_offer(monkeypatch):
+    fake = _FakeLLM(_result())
+    monkeypatch.setattr(rubric_mod, "llm_for", lambda task: fake)
+
+    rubric_mod.score_with_rubric(_offer(), _profile())
+
+    human = fake.structured.last_messages[-1][1]
+    assert human.index("=== CANDIDATE PROFILE ===") < human.index("=== JOB OFFER ===")
+
+
+def test_everything_before_the_offer_is_identical_across_offers(monkeypatch):
+    """The cache invariant. OpenAI caches on an exact prefix match, so every token
+    ahead of the offer marker must be byte-identical from one offer to the next —
+    otherwise the highest-volume call in the product caches nothing."""
+    fake = _FakeLLM(_result())
+    monkeypatch.setattr(rubric_mod, "llm_for", lambda task: fake)
+    profile = _profile()
+
+    rubric_mod.score_with_rubric(_offer(), profile)
+    first = fake.structured.last_messages
+
+    other = _offer()
+    other.title = "Staff Platform Engineer"
+    other.company = "Globex"
+    other.description = "Go, Kafka and Terraform. Nothing like the first offer."
+    rubric_mod.score_with_rubric(other, profile)
+    second = fake.structured.last_messages
+
+    assert first[0] == second[0]  # the system message
+    marker = "=== JOB OFFER ==="
+    assert first[-1][1].split(marker)[0] == second[-1][1].split(marker)[0]
 
 
 def test_llm_failure_propagates(monkeypatch):
@@ -112,4 +144,4 @@ def test_llm_failure_propagates(monkeypatch):
     # unlike query expansion, there is no useful degraded rubric — the caller
     # isolates this per offer instead
     with pytest.raises(RuntimeError):
-        rubric_mod.score_with_rubric(_offer(), _profile(), [])
+        rubric_mod.score_with_rubric(_offer(), _profile())
