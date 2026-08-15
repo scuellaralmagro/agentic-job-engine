@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from aje.api.profile import get_db_session
 from aje.discovery import manual as manual_mod
 from aje.discovery.estimate import estimate_run
-from aje.discovery.jobs import active_run_for_search, create_run, enqueue_run
+from aje.discovery.jobs import create_run, enqueue_run, start_run_for_search
 from aje.discovery.results import results_for_run
 from aje.discovery.scheduler import get_scheduler, remove_search_job, sync_search_job
 from aje.models import DiscoveryRun, Match, Offer, SavedSearch
@@ -131,16 +131,9 @@ def run_search(search_id: int, session: Session = Depends(get_db_session)) -> di
     saved = session.get(SavedSearch, search_id)
     if saved is None:
         raise HTTPException(status_code=404, detail="saved search not found")
-    if active_run_for_search(session, search_id) is not None:
+    run = start_run_for_search(session, saved)
+    if run is None:
         raise HTTPException(status_code=409, detail="this search is already running")
-    run = create_run(
-        session,
-        term=saved.query,
-        filters=saved.filters or {},
-        kind="scheduled",
-        saved_search_id=saved.id,
-    )
-    enqueue_run(run.id)
     return _run_out(run)
 
 

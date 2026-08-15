@@ -90,7 +90,7 @@ def test_update_missing_search_returns_404(session):
 
 def test_run_search_returns_a_queued_run_record(session, monkeypatch):
     """Run-now is asynchronous now: it hands back a run to watch, not a result."""
-    from aje.api import discovery as discovery_api
+    from aje.discovery import jobs as jobs_mod
 
     saved = SavedSearch(name="s", query="python", filters={"location": "Madrid"})
     session.add(saved)
@@ -98,7 +98,7 @@ def test_run_search_returns_a_queued_run_record(session, monkeypatch):
 
     enqueued: list[int] = []
     monkeypatch.setattr(
-        discovery_api, "enqueue_run", lambda rid, cap=None: enqueued.append(rid)
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append(rid)
     )
 
     resp = _client(session).post(f"/searches/{saved.id}/run")
@@ -111,6 +111,25 @@ def test_run_search_returns_a_queued_run_record(session, monkeypatch):
     assert body["filters"] == {"location": "Madrid"}
     assert body["saved_search_id"] == saved.id
     assert enqueued == [body["id"]]
+
+
+def test_run_now_on_a_saved_search_applies_its_cap(session, monkeypatch):
+    """Run-now was uncapped too: it called enqueue_run with no cap argument."""
+    from aje.discovery import jobs as jobs_mod
+
+    saved = SavedSearch(name="s", query="python", filters={}, max_offers=25)
+    session.add(saved)
+    session.commit()
+
+    enqueued: list[tuple[int, int | None]] = []
+    monkeypatch.setattr(
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append((rid, cap))
+    )
+
+    resp = _client(session).post(f"/searches/{saved.id}/run")
+
+    assert resp.status_code == 200
+    assert enqueued == [(resp.json()["id"], 25)]
 
 
 def test_run_missing_search_returns_404(session):
@@ -210,9 +229,9 @@ def test_post_runs_rejects_a_blank_term(session):
 
 
 def test_run_now_is_asynchronous_and_refuses_a_concurrent_run(session, monkeypatch):
-    from aje.api import discovery as discovery_api
+    from aje.discovery import jobs as jobs_mod
 
-    monkeypatch.setattr(discovery_api, "enqueue_run", lambda rid, cap=None: None)
+    monkeypatch.setattr(jobs_mod, "enqueue_run", lambda rid, cap=None: None)
     saved = SavedSearch(name="s", query="python", filters={})
     session.add(saved)
     session.commit()
