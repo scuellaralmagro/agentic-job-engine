@@ -68,6 +68,43 @@ Re-run `scratchpad/latency_check.py`-style A/B after any change — the check is
 calls and settles it in 90 seconds. Do not trust a token count as evidence of a
 cache hit; read `usage_metadata.input_token_details.cache_read` back from the API.
 
+## Study switching to OpenRouter
+
+**Raised:** 2026-08-15. Study first, decide after — this is a spike, not a commitment.
+
+Motivated by the caching finding above: the per-task model choice in `models.yaml` is
+currently pinned to one provider, so "this provider does not do prefix caching" is
+something we can only work around, not shop around. OpenRouter would make the provider a
+config value per task rather than a fixed assumption.
+
+Structurally cheap. `llm/registry.py` already dispatches on `spec.provider` through
+`register_chat_provider`, and OpenRouter is OpenAI-compatible, so the whole adapter is
+roughly `_openrouter_chat` = `ChatOpenAI(base_url=..., api_key=...)` in `providers.py`,
+one `AJE_OPENROUTER_API_KEY` in `config.py`, and `provider: openrouter` per task in
+`models.yaml`. No call site changes.
+
+What the study has to answer before any of that is worth doing:
+
+- **Structured output.** Scoring, extraction and discovery all rely on
+  `.with_structured_output(...)`. Support varies by underlying model and OpenRouter's
+  normalization of it is uneven. This is the one that can sink the idea — check it first,
+  against the actual `RubricResult` schema, not a toy one.
+- **Embeddings.** Verify whether OpenRouter serves them at all. If not,
+  `text-embedding-3-small` stays on OpenAI direct and the switch is partial — which is
+  fine (the registry already allows per-task providers) but should be a deliberate
+  choice, not a surprise.
+- **Caching.** Which models reachable through it actually do prefix caching, and whether
+  the discount survives the hop. If some do, item 2 above comes back to life — and the
+  reverted commit `452251b` is the shape to restore.
+- **Cost and latency.** OpenRouter takes a margin and adds a hop. Compare against the
+  measured ~1.1¢/rubric call and the current latency, and account for the extra failure
+  mode of a third party between us and the model.
+- **Usage metadata.** The cost model depends on reading `usage_metadata` back. Confirm
+  token accounting survives the proxy, or the spend numbers quietly become fiction.
+
+Re-run the caching A/B (see above) against any candidate before believing a claim on its
+pricing page.
+
 ## Scheduled runs have no spend cap
 
 **Found:** 2026-08-04, verifying the scheduled discovery path for the first time.
