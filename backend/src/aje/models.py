@@ -91,7 +91,12 @@ class SavedSearch(Base):
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
     schedule: Mapped[str | None] = mapped_column(String(128), nullable=True)  # cron expr
     # NULL means deliberately uncapped. See TODO.md "Scheduled runs have no spend cap".
-    max_offers: Mapped[int | None] = mapped_column(Integer, nullable=True, default=25)
+    #
+    # Deliberately no `default=25` here: SQLAlchemy applies a column default whenever
+    # the value is None at INSERT and cannot tell "explicitly None" from "unset", so a
+    # default would swallow an explicit NULL and make "uncapped" unexpressible. The 25
+    # lives on SavedSearchIn instead, where omitted and null are distinguishable.
+    max_offers: Mapped[int | None] = mapped_column(Integer, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

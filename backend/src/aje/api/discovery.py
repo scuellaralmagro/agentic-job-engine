@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 from sqlalchemy import select
@@ -19,6 +21,10 @@ class SavedSearchIn(BaseModel):
     query: str
     filters: dict = Field(default_factory=dict)
     schedule: str | None = None
+    # The default lives here, not only on the column: create_search does
+    # SavedSearch(**body.model_dump()), so a None default here would override the
+    # column default. Omitted -> 25, explicit null -> uncapped.
+    max_offers: Annotated[int, Field(ge=1)] | None = 25
 
 
 class OfferImportIn(BaseModel):
@@ -40,6 +46,7 @@ def _search_out(search: SavedSearch) -> dict:
         "query": search.query,
         "filters": search.filters,
         "schedule": search.schedule,
+        "max_offers": search.max_offers,
         "created_at": search.created_at.isoformat(),
     }
 

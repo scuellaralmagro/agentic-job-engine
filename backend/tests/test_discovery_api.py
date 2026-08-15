@@ -42,6 +42,46 @@ def test_saved_search_crud(session):
     assert client.get("/searches").json() == []
 
 
+def test_a_search_saved_without_a_cap_gets_the_default(session):
+    """The Pydantic default carries this, not the column: create_search does
+    SavedSearch(**body.model_dump()), so a None default would override the column
+    default and every new search would be born uncapped."""
+    client = _client(session)
+
+    created = client.post(
+        "/searches", json={"name": "s", "query": "python", "filters": {}}
+    )
+
+    assert created.status_code == 200
+    assert created.json()["max_offers"] == 25
+
+
+def test_an_explicit_null_cap_means_uncapped(session):
+    """Also guards the model: SQLAlchemy applies a column default whenever the value
+    is None at INSERT and cannot tell "explicitly None" from "unset", so putting
+    default=25 back on SavedSearch.max_offers would swallow this and fail here."""
+    client = _client(session)
+
+    created = client.post(
+        "/searches",
+        json={"name": "s", "query": "python", "filters": {}, "max_offers": None},
+    )
+
+    assert created.status_code == 200
+    assert created.json()["max_offers"] is None
+
+
+def test_a_zero_or_negative_cap_is_rejected(session):
+    client = _client(session)
+
+    for bad in (0, -5):
+        resp = client.post(
+            "/searches",
+            json={"name": "s", "query": "python", "filters": {}, "max_offers": bad},
+        )
+        assert resp.status_code == 422
+
+
 def test_update_missing_search_returns_404(session):
     client = _client(session)
     resp = client.put("/searches/999", json={"name": "x", "query": "y", "filters": {}})
