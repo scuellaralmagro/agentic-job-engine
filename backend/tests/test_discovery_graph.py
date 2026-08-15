@@ -43,6 +43,30 @@ def _no_llm_expansion(monkeypatch):
     monkeypatch.setattr(graph_mod, "expand_query", lambda term: [term])
 
 
+def test_run_discovery_builds_its_run_through_the_shared_constructor(
+    session, monkeypatch
+):
+    """Two places constructing a DiscoveryRun is how the manual and scheduled paths
+    drifted apart. There must be exactly one."""
+    from aje.discovery import jobs as jobs_mod
+
+    calls: list[dict] = []
+    real = jobs_mod.create_run
+
+    def spy(sess, **kwargs):
+        calls.append(kwargs)
+        return real(sess, **kwargs)
+
+    monkeypatch.setattr(jobs_mod, "create_run", spy)
+
+    adapter = _StubAdapter("stub", [_raw("Python Dev")])
+    graph_mod.run_discovery(session, term="python", adapters=[adapter], score=False)
+
+    assert len(calls) == 1
+    assert calls[0]["kind"] == "manual"
+    assert calls[0]["term"] == "python"
+
+
 def test_run_persists_offers_and_records_run(session):
     adapter = _StubAdapter(
         "stub", [_raw("Backend Dev"), _raw("Data Eng", url="https://x/2")]

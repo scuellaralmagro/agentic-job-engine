@@ -255,24 +255,28 @@ def run_discovery(
     score: bool = True,
     max_offers: int | None = None,
 ) -> DiscoveryRun:
-    """Synchronous create-then-execute. The API enqueues instead; see discovery.jobs."""
+    """Synchronous create-then-execute, kept for tests and scripts.
+
+    Production never calls this: the API and cron both go through
+    discovery.jobs.start_run_for_search, which enqueues instead of blocking.
+    """
+    # Imported here, not at module scope: jobs imports discover_into_run from this
+    # module, so a top-level import would be circular. scheduler.py does the same.
+    from aje.discovery.jobs import create_run
+
     merged = dict(filters or {})
     if location is not None:
         merged.setdefault("location", location)
     if remote is not None:
         merged.setdefault("remote", remote)
 
-    run = DiscoveryRun(
-        saved_search_id=saved_search_id,
-        kind="scheduled" if saved_search_id else "manual",
+    run = create_run(
+        session,
         term=term,
         filters=merged,
-        started_at=datetime.utcnow(),
-        status="running",
-        source_results=[],
+        kind="scheduled" if saved_search_id else "manual",
+        saved_search_id=saved_search_id,
     )
-    session.add(run)
-    session.commit()
     return discover_into_run(
         session, run, adapters=adapters, score=score, max_offers=max_offers
     )
