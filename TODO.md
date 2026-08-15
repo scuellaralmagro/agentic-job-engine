@@ -226,6 +226,47 @@ one token, but different cities stay different.
 
 Migration is forward-only: `downgrade` cannot restore the previous hash values.
 
+## LinkedIn was scraped and discarded on every run — fixed 2026-08-15
+
+**Found:** investigating why all 248 stored offers were `jobspy:indeed` and
+`tecnoempleo` despite four JobSpy sites being enabled.
+
+Not rate-limiting and not flaky — a deterministic interaction between two correct
+halves. JobSpy ends `scrape_jobs` with
+`sort_values(by=["site", "date_posted"], ascending=[True, False])`, so the combined
+frame is ordered alphabetically by site. The adapter then truncated with
+`offers[:max_results]`. `indeed` sorts before `linkedin`, Indeed's 50 rows filled the
+budget, and all 50 LinkedIn rows fell off the end. Reproduced exactly: 100 rows in,
+`head(50)` entirely indeed, the discarded tail entirely linkedin.
+
+Fixed by building **one adapter per site**. The graph's existing per-adapter machinery
+then supplies per-site budgets, `SourceResult`s, error isolation and threads for free.
+`max_results` now means per site.
+
+**Three lessons worth keeping:**
+
+- **A silent success is worse than a failure.** Every run recorded
+  `{'source': 'jobspy', 'count': 50, 'error': None}` — healthy-looking, while three of
+  four boards contributed nothing. `_fan_out_node` builds one `SourceResult` per
+  *adapter*, so anything an adapter aggregates internally is invisible. Prefer adapters
+  that map one-to-one onto the thing that can fail.
+- **Config that lies costs money.** `sites: [linkedin, indeed, glassdoor, google]` was
+  scraped in full every run and three quarters of it thrown away or errored.
+- **`max_results` meant two different things** at two layers: JobSpy applies
+  `results_wanted` per site, the adapter applied it as a total. Four sites fetched up to
+  200 rows to keep 50.
+
+glassdoor and google are removed from `sources.yaml`: glassdoor answers HTTP 400
+"location not parsed" for `Madrid, Spain`, google returns nothing without a
+`google_search_term`. Re-add only with evidence they return rows.
+
+**Consequence to watch:** JobSpy now contributes up to 100 offers per run instead of 50,
+so runs find more and cost more to score. The per-search `max_offers` cap bounds it.
+
+Also relevant to the shelved seniority filter: LinkedIn now fetches descriptions, which
+is the same request that populates `job_level`. Mapping it is now cheap — see
+"Seniority filter" above.
+
 ## Queue source filter
 
 Specced in the UI spec, never implemented. Status, min-fitness, sort and text search all
