@@ -33,7 +33,19 @@ def build_adapters(config: SourcesConfig, settings: Settings) -> list[SourceAdap
                 )
             )
         elif name == "jobspy":
-            adapters.append(JobSpyAdapter(source_settings))
+            if not source_settings.sites:
+                logger.warning("jobspy enabled but no sites configured; skipping")
+                continue
+            # One adapter per site, not one covering all of them. A single adapter
+            # handed every site to one scrape_jobs call and truncated the combined
+            # frame, which JobSpy sorts alphabetically by site — so "linkedin" was
+            # discarded in full on every run. Splitting them also gives each site its
+            # own SourceResult, so a dead board is visible in the run record instead
+            # of hiding inside an aggregate count.
+            adapters.extend(
+                JobSpyAdapter(source_settings, site=site)
+                for site in source_settings.sites
+            )
         elif name == "tecnoempleo":
             adapters.append(TecnoempleoAdapter(source_settings))
         else:

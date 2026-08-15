@@ -40,10 +40,24 @@ def _to_datetime(value: object) -> datetime | None:
 
 
 class JobSpyAdapter:
-    name = "jobspy"
+    """One instance per board. `registry.build_adapters` creates one per configured
+    site, which is load-bearing rather than cosmetic.
 
-    def __init__(self, settings: SourceSettings) -> None:
+    A single adapter covering every site used to hand all of them to one
+    `scrape_jobs` call and then truncate with `offers[:max_results]`. JobSpy sorts
+    its combined frame alphabetically by site, so "indeed" filled the budget and
+    every "linkedin" row was discarded — silently, on every run, after paying to
+    scrape it.
+
+    One adapter per site also means the discovery graph's existing per-adapter
+    machinery does the rest for free: each site gets its own `max_results`, its own
+    `SourceResult` in the run record, its own error isolation, and its own thread.
+    """
+
+    def __init__(self, settings: SourceSettings, *, site: str) -> None:
         self.settings = settings
+        self.site = site
+        self.name = f"jobspy:{site}"
 
     def search(self, query: SearchQuery) -> list[RawOffer]:
         offers: list[RawOffer] = []
@@ -55,13 +69,18 @@ class JobSpyAdapter:
 
     def _search_term(self, term: str, query: SearchQuery) -> list[RawOffer]:
         frame = scrape_jobs(
-            site_name=list(self.settings.sites),
+            site_name=[self.site],
             search_term=term,
             location=query.location,
             country_indeed=self.settings.country or "Spain",
             results_wanted=self.settings.max_results,
             is_remote=bool(query.remote),
             description_format="markdown",
+            # LinkedIn returns no description at all without this, and the scoring
+            # rubric reads the description — an offer without one would be scored on
+            # its title alone. It costs roughly 0.75s per job (one extra request), so
+            # it stays off for boards that already send descriptions.
+            linkedin_fetch_description=self.site == "linkedin",
         )
         if frame is None or len(frame) == 0:
             return []
@@ -75,14 +94,17 @@ class JobSpyAdapter:
         title = _clean(row.get("title"))
         if not title:
             return None
-        site = _clean(row.get("site")) or "unknown"
+        # Taken from the row rather than self.site so the stored source reflects what
+        # the board actually said. They agree in practice — an adapter requests one
+        # site — but the row is the more truthful of the two.
+        site = _clean(row.get("site")) or self.site
         return RawOffer(
             title=title,
             company=_clean(row.get("company")),
             location=_clean(row.get("location")),
             description=_clean(row.get("description")),
             url=_clean(row.get("job_url")),
-            source=f"{self.name}:{site}",
+            source=f"jobspy:{site}",
             posted_at=_to_datetime(row.get("date_posted")),
             is_remote=_to_bool(row.get("is_remote")),
         )

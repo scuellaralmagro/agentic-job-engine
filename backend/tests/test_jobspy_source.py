@@ -30,7 +30,7 @@ _FRAME = pd.DataFrame(
 )
 
 
-def _adapter(**overrides):
+def _adapter(site="linkedin", **overrides):
     fields = {
         "enabled": True,
         "country": "Spain",
@@ -38,7 +38,7 @@ def _adapter(**overrides):
         "sites": ["linkedin", "indeed"],
     }
     fields.update(overrides)
-    return jobspy_source.JobSpyAdapter(SourceSettings(**fields))
+    return jobspy_source.JobSpyAdapter(SourceSettings(**fields), site=site)
 
 
 def test_search_maps_dataframe_to_raw_offers(monkeypatch):
@@ -70,12 +70,57 @@ def test_search_passes_config_through_to_scrape_jobs(monkeypatch):
 
     _adapter().search(SearchQuery(terms=["python"], location="Madrid", remote=True))
 
-    assert seen["site_name"] == ["linkedin", "indeed"]
+    assert seen["site_name"] == ["linkedin"]
     assert seen["search_term"] == "python"
     assert seen["location"] == "Madrid"
     assert seen["country_indeed"] == "Spain"
     assert seen["results_wanted"] == 10
     assert seen["is_remote"] is True
+
+
+def test_one_adapter_scrapes_exactly_one_site(monkeypatch):
+    """Sites used to share a single scrape and a single max_results truncation.
+
+    JobSpy sorts its combined frame alphabetically by site, so 'indeed' filled the
+    budget and every 'linkedin' row was discarded by offers[:max_results] — silently,
+    on every run, for the project's whole history.
+    """
+    seen = []
+    monkeypatch.setattr(
+        jobspy_source,
+        "scrape_jobs",
+        lambda **kw: seen.append(kw["site_name"]) or pd.DataFrame([]),
+    )
+
+    _adapter(site="indeed").search(SearchQuery(terms=["python"]))
+
+    assert seen == [["indeed"]], "one adapter must never scrape a sibling's site"
+
+
+def test_the_adapter_is_named_for_its_site(monkeypatch):
+    """_fan_out_node builds one SourceResult per adapter.name, so this is what makes
+    a dead site visible in run history instead of hiding inside an aggregate row."""
+    assert _adapter(site="linkedin").name == "jobspy:linkedin"
+    assert _adapter(site="indeed").name == "jobspy:indeed"
+
+
+def test_linkedin_fetches_descriptions_but_other_sites_do_not(monkeypatch):
+    """LinkedIn returns no description at all unless asked, and the rubric reads the
+    description — an offer without one scores on its title alone. Costs ~0.75s/job,
+    so it is only turned on for the site that needs it."""
+    seen = {}
+
+    def fake(**kwargs):
+        seen[kwargs["site_name"][0]] = kwargs.get("linkedin_fetch_description")
+        return pd.DataFrame([])
+
+    monkeypatch.setattr(jobspy_source, "scrape_jobs", fake)
+
+    _adapter(site="linkedin").search(SearchQuery(terms=["python"]))
+    _adapter(site="indeed").search(SearchQuery(terms=["python"]))
+
+    assert seen["linkedin"] is True
+    assert not seen["indeed"]
 
 
 def test_search_handles_empty_frame(monkeypatch):
