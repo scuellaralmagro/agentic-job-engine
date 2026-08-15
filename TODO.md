@@ -33,10 +33,9 @@ In order. Work mode is done; the rest are next.
    "Scheduled runs have no spend cap" below for what it closed.
 4. ~~Salary extraction + filter~~ — **dropped 2026-08-15, the premise was wrong.**
    See "Salary is not in the data" below before reconsidering.
-5. **Fix cross-source dedup** ← **next.** `compute_offer_hash` uses the raw location, so the
-   same job on Indeed ("Madrid, MD, ES") and Tecnoempleo ("Madrid") is stored and
-   scored twice. Normalizing location into the hash cuts duplicate spend.
-6. **Application tracking** — the queue stops at `accepted`; there is no applied
+5. ~~Fix cross-source dedup~~ — done 2026-08-15. See "Cross-source dedup" below;
+   the payoff was queue quality, not the spend this item claimed.
+6. **Application tracking** ← **next.** The queue stops at `accepted`; there is no applied
    date, response or interview state. The CV and cover letter already hang off the
    match, so this is where they belong.
 
@@ -188,6 +187,44 @@ Three things a future attempt should not have to rediscover:
 The layering matters: work mode filters *searches* because the source supplies it before
 scoring. Seniority from the rubric is only known *after* paying to score, so it filters
 the **Queue**, not discovery. Only the LinkedIn route could filter searches.
+
+## Cross-source dedup — fixed 2026-08-15
+
+**The item's justification was wrong and is worth recording.** It claimed normalizing
+location "cuts duplicate spend". Measured across all 248 stored offers before building:
+
+| | |
+|---|---|
+| title+company groups with more than one offer | 7 |
+| …spanning more than one source | **2** |
+| …within a single source | 5 |
+| offers scored twice for the same job | 6 |
+| wasted spend, whole project history | **$0.066** |
+
+Seven cents. The real payoff is that the same job stops appearing twice in the review
+queue. Fixed anyway — it is cheap and correct — but do not cite it as a cost measure.
+
+**Five of the seven groups were not duplicates at all.** They are real openings in
+different cities under one title and company (MAP advertises the same consultant role in
+Madrid, Málaga and Barcelona). The current hash kept them apart *because* it included
+location, so the obvious fix — drop location from the hash — would have silently deleted
+real jobs. `canonical_location` normalizes instead: Indeed's `City, REGION, COUNTRY` and
+Tecnoempleo's bare `City` reduce to one key, and every spelling of remote collapses to
+one token, but different cities stay different.
+`test_hash_keeps_different_cities_apart` is the guard.
+
+**The migration was the hard part**, and two things about it were not in the design:
+
+- `content_hash` is unique, so both rows of a collided pair cannot hold the new hash. The
+  loser keeps what it had and becomes an inert historical row; nothing is deleted.
+- "Loser keeps its old hash" breaks when the loser's old hash *is* the contested value,
+  which happens whenever the Tecnoempleo row already spelled the location canonically.
+  Win order is therefore: scored row first, then a row already holding its own new hash,
+  then lowest id. Getting this backwards would have pointed the canonical hash at the
+  *unscored* row, so every re-find would pay to score a job that was already scored — the
+  fix would have cost money instead of saving it.
+
+Migration is forward-only: `downgrade` cannot restore the previous hash values.
 
 ## Queue source filter
 
