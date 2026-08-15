@@ -18,7 +18,24 @@ def test_builds_only_enabled_adapters():
     adapters = build_adapters(
         config, _settings(adzuna_app_id="id", adzuna_app_key="key")
     )
-    assert sorted(a.name for a in adapters) == ["adzuna", "jobspy"]
+    assert sorted(a.name for a in adapters) == ["adzuna", "jobspy:linkedin"]
+
+
+def test_jobspy_yields_one_adapter_per_site():
+    """Each site needs its own adapter to get its own max_results and SourceResult.
+    Sharing one truncated every site after the alphabetically-first."""
+    config = SourcesConfig(
+        sources={"jobspy": SourceSettings(enabled=True, sites=["linkedin", "indeed"])}
+    )
+    adapters = build_adapters(config, _settings())
+
+    assert [a.name for a in adapters] == ["jobspy:linkedin", "jobspy:indeed"]
+    assert [a.site for a in adapters] == ["linkedin", "indeed"]
+
+
+def test_jobspy_without_sites_is_skipped():
+    config = SourcesConfig(sources={"jobspy": SourceSettings(enabled=True, sites=[])})
+    assert build_adapters(config, _settings()) == []
 
 
 def test_adzuna_skipped_without_credentials():

@@ -161,8 +161,31 @@ Sources (`discovery/registry.py`):
 | Source | Kind | Note |
 |---|---|---|
 | **Adzuna** | Official API | Preferred on legal grounds. Skipped with a warning if `AJE_ADZUNA_APP_ID` / `AJE_ADZUNA_APP_KEY` are unset. |
-| **JobSpy** | Library scraper | LinkedIn, Indeed, Glassdoor, Google. |
+| **JobSpy** | Library scraper | **One adapter per site** — currently LinkedIn and Indeed. |
 | **Tecnoempleo** | HTML scraper | Spanish market; throttled by `delay_seconds`. |
+
+**JobSpy is split into one adapter per site, and that is load-bearing.** A single
+adapter covering every site handed them all to one `scrape_jobs` call and truncated the
+result with `offers[:max_results]`. JobSpy sorts its combined frame alphabetically by
+site, so `indeed` filled the budget and every `linkedin` row was discarded — silently,
+on every run, after paying to scrape it. All 248 offers stored before 2026-08-15 came
+from Indeed and Tecnoempleo alone.
+
+Splitting them lets the graph's existing per-adapter machinery carry the weight: each
+site gets its own `max_results`, its own `SourceResult` in the run record, its own error
+isolation, and its own thread. `max_results` is therefore **per site**, not a shared
+budget.
+
+LinkedIn alone sets `linkedin_fetch_description=True`. Without it LinkedIn returns no
+description at all, and since the scoring rubric reads the description, those offers
+would be scored on their titles. It costs roughly 0.75s per job.
+
+Glassdoor and Google were removed after measuring: Glassdoor answers HTTP 400 "location
+not parsed" for `Madrid, Spain`, and Google returns nothing without a
+`google_search_term`. Both failed **silently** inside JobSpy — which is why per-site
+`SourceResult` rows matter. The old aggregate row read
+`{'source': 'jobspy', 'count': 50, 'error': None}` on every run, indistinguishable from
+healthy while three of four boards contributed nothing.
 
 **Work-mode detection** (`discovery/work_mode.py`) is **deterministic, not an LLM
 call** — `remote` / `hybrid` / `onsite` / `NULL`. The load-bearing detail: an early

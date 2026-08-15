@@ -6,10 +6,15 @@ sources:
     max_terms: 3
   jobspy:
     enabled: true
+    # Per site, not shared: the registry builds one adapter per entry in `sites`.
     max_results: 50
     max_terms: 2
     country: Spain
-    sites: [linkedin, indeed, glassdoor, google]
+    # glassdoor and google were dropped 2026-08-15 after measuring: glassdoor answers
+    # HTTP 400 "location not parsed" for "Madrid, Spain" and google returns nothing
+    # without a google_search_term. Both failed silently inside JobSpy and cost scrape
+    # time on every run. Re-add only with evidence they return rows.
+    sites: [linkedin, indeed]
   tecnoempleo:
     enabled: true
     max_results: 50
