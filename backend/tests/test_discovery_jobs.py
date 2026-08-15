@@ -1,4 +1,5 @@
 from aje.discovery import jobs as jobs_mod
+from aje.models import SavedSearch
 
 
 class _KeepsOpen:
@@ -60,6 +61,66 @@ def test_reconcile_marks_orphaned_running_runs_as_failed(session):
     assert count == 1
     assert stale.status == "failed" and stale.finished_at is not None
     assert done.status == "ok"
+
+
+def _saved(session, **kwargs):
+    search = SavedSearch(
+        name=kwargs.pop("name", "s"),
+        query=kwargs.pop("query", "python"),
+        filters=kwargs.pop("filters", {"location": "Madrid"}),
+        **kwargs,
+    )
+    session.add(search)
+    session.commit()
+    return search
+
+
+def test_start_run_for_search_enqueues_with_the_searchs_cap(session, monkeypatch):
+    """The cap is the whole point: a scheduled search that reaches enqueue_run
+    without one scores every new offer it finds."""
+    search = _saved(session, max_offers=25)
+    enqueued: list[tuple[int, int | None]] = []
+    monkeypatch.setattr(
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append((rid, cap))
+    )
+
+    run = jobs_mod.start_run_for_search(session, search)
+
+    assert run is not None
+    assert run.saved_search_id == search.id
+    assert run.kind == "scheduled"
+    assert run.term == "python"
+    assert run.filters == {"location": "Madrid"}
+    assert enqueued == [(run.id, 25)]
+
+
+def test_start_run_for_search_passes_none_for_an_uncapped_search(session, monkeypatch):
+    """NULL means deliberately uncapped and must survive as None, not become a number."""
+    search = _saved(session, max_offers=None)
+    enqueued: list[tuple[int, int | None]] = []
+    monkeypatch.setattr(
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append((rid, cap))
+    )
+
+    run = jobs_mod.start_run_for_search(session, search)
+
+    assert enqueued == [(run.id, None)]
+
+
+def test_start_run_for_search_refuses_when_one_is_already_running(session, monkeypatch):
+    """Overlapping runs double-spend. The caller decides whether that is a 409
+    or a logged skip; this function just declines."""
+    search = _saved(session, max_offers=25)
+    jobs_mod.create_run(
+        session, term="python", filters={}, kind="scheduled", saved_search_id=search.id
+    )
+    enqueued: list[int] = []
+    monkeypatch.setattr(
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append(rid)
+    )
+
+    assert jobs_mod.start_run_for_search(session, search) is None
+    assert enqueued == []
 
 
 def test_active_run_for_search_finds_only_running_ones(session):
