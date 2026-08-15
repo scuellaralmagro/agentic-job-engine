@@ -105,6 +105,7 @@ export interface SearchOut {
   query: string;
   filters: Record<string, unknown>;
   schedule: string | null;
+  max_offers: number | null;
   created_at: string;
 }
 

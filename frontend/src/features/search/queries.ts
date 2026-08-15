@@ -1,7 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { apiFetch, ApiError } from "@/lib/api/client";
-import type { DiscoveryResultOut, RunEstimate, RunOut } from "@/lib/api/types";
+import type { DiscoveryResultOut, RunOut } from "@/lib/api/types";
 
 /** A finished run never changes again — stop polling rather than slowing it down. */
 export function resultsRefetchInterval(run: RunOut | undefined): number | false {
@@ -21,14 +21,6 @@ export function useRunResults(runId: number, run: RunOut | undefined) {
     queryKey: ["run-results", runId],
     queryFn: () => apiFetch<DiscoveryResultOut[]>(`/runs/${runId}/results`),
     refetchInterval: resultsRefetchInterval(run),
-  });
-}
-
-export function useEstimate() {
-  return useQuery({
-    queryKey: ["run-estimate"],
-    queryFn: () => apiFetch<RunEstimate>("/runs/estimate"),
-    staleTime: 60_000,
   });
 }
 
