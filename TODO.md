@@ -31,10 +31,9 @@ In order. Work mode is done; the rest are next.
 3. ~~Scheduled-run spend cap~~ — done 2026-08-15. Promoted ahead of salary because
    it was a measured ~$25/month leak while item 2 turned out to be worth $0. See
    "Scheduled runs have no spend cap" below for what it closed.
-4. **Salary extraction + filter** ← **next.** JobSpy returns min/max salary and
-   `_to_raw_offer` discards it, exactly as it did `is_remote`. Same shape as work
-   mode, so it follows cheaply.
-5. **Fix cross-source dedup** — `compute_offer_hash` uses the raw location, so the
+4. ~~Salary extraction + filter~~ — **dropped 2026-08-15, the premise was wrong.**
+   See "Salary is not in the data" below before reconsidering.
+5. **Fix cross-source dedup** ← **next.** `compute_offer_hash` uses the raw location, so the
    same job on Indeed ("Madrid, MD, ES") and Tecnoempleo ("Madrid") is stored and
    scored twice. Normalizing location into the hash cuts duplicate spend.
 6. **Application tracking** — the queue stops at `accepted`; there is no applied
@@ -138,6 +137,57 @@ Two traps worth remembering:
   `SavedSearchIn`, the only layer where omitted and null differ.
 - **The dialog always sends the field**, so the API's omitted-field default never fires
   from the UI. The dialog pre-fills 25 itself.
+
+## Salary is not in the data
+
+**Found:** 2026-08-15, measuring before implementing the queued salary item. **Dropped.**
+
+The item said "JobSpy returns min/max salary and `_to_raw_offer` discards it, exactly as
+it did `is_remote`". The discarding was real; the returning is not. Live scrapes:
+
+| source | postings | with salary |
+|---|---|---|
+| Indeed ES — "AI Engineer" | 40 | 0 |
+| Indeed ES — "Software Engineer" | 30 | 0 |
+| Indeed ES — "Data Engineer" | 30 | 0 |
+| LinkedIn Madrid | 30 | 0 |
+
+Structural, not bad luck: JobSpy only runs description-based salary extraction when
+`country_indeed == USA` (`jobspy/__init__.py:169`). Outside the US you get board-supplied
+compensation only, and Indeed ES essentially never has it. Building the item as written
+gives a filter over a permanently empty column.
+
+**If it is ever revisited, the data is at Tecnoempleo, not JobSpy.** Its listing pages
+publish explicit ranges (`30.000€ - 33.000€ b/a`) and `tecnoempleo.py::_to_raw_offer`
+never parses them — and Tecnoempleo is 115 of the 248 stored offers. That is the version
+worth building. The JobSpy mapping is three lines and can ride along, but it is not the
+feature.
+
+## Seniority filter — feasible, but not where it looks
+
+**Assessed:** 2026-08-15, alongside the salary measurement. Not built.
+
+Three things a future attempt should not have to rediscover:
+
+- **`Offer.seniority` already exists and is already populated** — by the scoring LLM via
+  `enrich_offer`, from `OfferRequirements.seniority`. It is free prose and unfilterable:
+  122 of 248 offers have a value and nearly every value is unique, e.g. *"Senior Software
+  Engineer; explicitly requires 5+ years of Python experience and large-scale scraping
+  projects, plus technical leadership/innovation in scraping."*
+- **LinkedIn's `job_level` is a clean categorical** (`entry level`, `associate`,
+  `mid-senior level`, `director`, `executive`), confirmed populating 10/10 — **but only
+  with `linkedin_fetch_description=True`**, which `jobspy_source.py` does not pass.
+  Without it the field is an empty string and descriptions come back empty too. It costs
+  one HTTP fetch per job. Note LinkedIn currently contributes **0** stored offers — all
+  248 are `jobspy:indeed` and `tecnoempleo` — plausibly because all four configured sites
+  share one `max_results: 50` budget and LinkedIn is truncated out. Fix that first.
+- **The cheapest path is already running.** The rubric call extracts
+  `requirements.seniority` today and is already paid for. Constraining that field to an
+  enum instead of prose makes it filterable at zero extra LLM cost.
+
+The layering matters: work mode filters *searches* because the source supplies it before
+scoring. Seniority from the rubric is only known *after* paying to score, so it filters
+the **Queue**, not discovery. Only the LinkedIn route could filter searches.
 
 ## Queue source filter
 
