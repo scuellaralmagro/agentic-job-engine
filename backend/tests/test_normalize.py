@@ -23,6 +23,29 @@ def test_hash_collapses_same_job_from_different_sources():
     )
 
 
+def test_hash_reconciles_the_two_boards_location_formats():
+    """The actual defect: Indeed writes "Madrid, MD, ES" and Tecnoempleo "Madrid"
+    for the same job, so it was stored twice and could be scored twice."""
+    assert compute_offer_hash(
+        "AI Architect Engineer", "Accenture", "Madrid, MD, ES"
+    ) == compute_offer_hash("AI Architect Engineer", "Accenture", "Madrid")
+
+
+def test_hash_reconciles_the_two_boards_remote_spellings():
+    assert compute_offer_hash(
+        "Backend Dev", "Acme", "En remoto, ES"
+    ) == compute_offer_hash("Backend Dev", "Acme", "100% remoto")
+
+
+def test_hash_keeps_different_cities_apart():
+    """The regression guard. Five of the seven duplicate groups in the live data are
+    real openings in different cities under one title and company — dropping location
+    from the hash instead of normalizing it would silently delete them."""
+    madrid = compute_offer_hash("Desarrollador Senior IA", "Accenture", "Madrid, MD, ES")
+    malaga = compute_offer_hash("Desarrollador Senior IA", "Accenture", "Málaga, AN, ES")
+    assert madrid != malaga
+
+
 def test_hash_tolerates_missing_company_and_location():
     assert compute_offer_hash("Dev", None, None) == compute_offer_hash("Dev", None, None)
 
