@@ -2,7 +2,7 @@ import pytest
 
 from aje.discovery import graph as graph_mod
 from aje.discovery.schema import RawOffer, SearchQuery
-from aje.models import DiscoveryRun, Offer, SavedSearch
+from aje.models import DiscoveryRun, Offer
 
 
 class _StubAdapter:
@@ -187,23 +187,6 @@ def test_no_work_mode_filter_keeps_everything(session):
     assert session.query(Offer).count() == 2
 
 
-def test_run_saved_search_uses_stored_query_and_links_run(session, monkeypatch):
-    saved = SavedSearch(
-        name="Python Madrid",
-        query="python",
-        filters={"locations": ["Madrid"]},
-    )
-    session.add(saved)
-    session.commit()
-
-    adapter = _StubAdapter("stub", [_raw("Backend Dev", location="Madrid")])
-    monkeypatch.setattr(graph_mod, "build_adapters", lambda config, settings: [adapter])
-
-    run = graph_mod.run_saved_search(session, saved.id, score=False)
-
-    assert run.saved_search_id == saved.id
-    assert run.offers_new == 1
-    assert session.query(DiscoveryRun).count() == 1
 
 
 def test_run_records_a_result_for_every_offer_including_refinds(session):

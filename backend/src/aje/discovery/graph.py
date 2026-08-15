@@ -15,7 +15,7 @@ from aje.discovery.normalize import to_offer
 from aje.textnorm import normalize_text
 from aje.discovery.registry import build_adapters
 from aje.discovery.schema import RawOffer, SearchQuery, SourceResult
-from aje.models import DiscoveryRun, Offer, SavedSearch
+from aje.models import DiscoveryRun, Offer
 from aje.scoring.graph import score_offers
 
 logger = logging.getLogger(__name__)
@@ -278,19 +278,3 @@ def run_discovery(
     )
 
 
-def run_saved_search(
-    session: Session, saved_search_id: int, *, score: bool = True
-) -> DiscoveryRun:
-    saved = session.get(SavedSearch, saved_search_id)
-    if saved is None:
-        raise ValueError(f"no saved search with id {saved_search_id}")
-    filters = saved.filters or {}
-    return run_discovery(
-        session,
-        term=saved.query,
-        location=filters.get("location"),
-        remote=filters.get("remote"),
-        filters=filters,
-        saved_search_id=saved.id,
-        score=score,
-    )

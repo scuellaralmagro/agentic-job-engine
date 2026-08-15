@@ -21,11 +21,19 @@ def job_id_for(saved_search_id: int) -> str:
 def run_saved_search_job(saved_search_id: int) -> None:
     """Module-level entry point so APScheduler can persist a reference to it."""
     from aje.db import get_session
-    from aje.discovery.graph import run_saved_search
+    from aje.discovery.jobs import start_run_for_search
 
     session = get_session()
     try:
-        run_saved_search(session, saved_search_id)
+        saved = session.get(SavedSearch, saved_search_id)
+        if saved is None:
+            logger.warning("scheduled search %s no longer exists", saved_search_id)
+            return
+        if start_run_for_search(session, saved) is None:
+            logger.info(
+                "scheduled search %s skipped: a run is already in flight",
+                saved_search_id,
+            )
     except Exception:  # noqa: BLE001 - a failed run must not kill the scheduler
         logger.exception("scheduled discovery run failed for search %s", saved_search_id)
     finally:
