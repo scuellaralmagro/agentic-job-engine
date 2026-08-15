@@ -10,6 +10,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import type { SearchOut } from "@/lib/api/types";
+import { useEstimate } from "@/lib/api/queries";
 import { useSaveSearch } from "./queries";
 
 export function SearchDialog({
@@ -22,10 +23,12 @@ export function SearchDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const save = useSaveSearch();
+  const estimate = useEstimate();
   const [name, setName] = useState("");
   const [query, setQuery] = useState("");
   const [filters, setFilters] = useState("{}");
   const [schedule, setSchedule] = useState("");
+  const [cap, setCap] = useState("25");
   const [filterError, setFilterError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -34,9 +37,19 @@ export function SearchDialog({
       setQuery(search?.query ?? "");
       setFilters(JSON.stringify(search?.filters ?? {}, null, 2));
       setSchedule(search?.schedule ?? "");
+      // A new search shows the default explicitly: the dialog always sends this
+      // field, so the API's omitted-field default never fires from here.
+      setCap(
+        search ? (search.max_offers != null ? String(search.max_offers) : "") : "25",
+      );
       setFilterError(null);
     }
   }, [open, search]);
+
+  const perOffer = estimate.data?.cost_per_offer_usd ?? 0;
+  const ceiling = estimate.data?.max_offers ?? 0;
+  const capped = cap.trim() !== "";
+  const perRun = (capped ? Number(cap) : ceiling) * perOffer;
 
   const submit = () => {
     let parsed: Record<string, unknown>;
@@ -53,6 +66,7 @@ export function SearchDialog({
         query,
         filters: parsed,
         schedule: schedule.trim() || null,
+        max_offers: capped ? Number(cap) : null,
       },
       { onSuccess: () => onOpenChange(false) },
     );
@@ -108,6 +122,29 @@ export function SearchDialog({
             <p className="mt-1 text-xs text-ink-dim">
               Cron format — leave empty for manual-only.
             </p>
+          </div>
+          <div>
+            <Label htmlFor="s-cap">Max offers per run</Label>
+            <Input
+              id="s-cap"
+              className="bg-surface"
+              // Not "25": a greyed 25 in an empty field reads as a value, while an
+              // empty field here means uncapped — the opposite of what it suggests.
+              placeholder="no cap"
+              value={cap}
+              onChange={(e) => setCap(e.target.value.replace(/\D/g, ""))}
+            />
+            {capped ? (
+              <p className="mt-1 text-xs text-ink-dim">
+                ~${perRun.toFixed(2)} per run
+                {schedule.trim() &&
+                  ` · ~$${(perRun * 30).toFixed(2)}/month if it runs daily`}
+              </p>
+            ) : (
+              <p className="mt-1 text-xs text-danger">
+                Uncapped — up to {ceiling} offers, ~${perRun.toFixed(2)} per run.
+              </p>
+            )}
           </div>
           <Button
             className="w-full"
