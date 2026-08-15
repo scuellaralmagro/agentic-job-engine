@@ -5,24 +5,29 @@
 In order. Work mode is done; the rest are next.
 
 1. ~~Work mode detection + search selection~~ — done
-2. ~~Scoring prompt cache reorder~~ — done, but **it does not pay off yet.** The
-   prompt is now system → whole profile → offer, a 1302-token prefix that is
-   byte-identical across all 248 stored offers. Verified live, and the premise of
-   the whole item turned out to be wrong: **this provider does not do prefix
-   caching.** A byte-identical repeat cached 2690/2693 tokens, but two offers
-   sharing the 1302-token prefix cached 0, even 90s apart. Scoring sends a
-   different offer every call, so nothing caches in practice. The usage payload
-   carries `cache_creation` / `cache_write_tokens` — Anthropic-style *explicit*
-   breakpoint accounting — so the missing piece is likely a cache breakpoint that
-   `ChatOpenAI` never emits. See "Prompt caching is not actually on" below.
+2. ~~Scoring prompt cache reorder~~ — **tried, measured, reverted.** Do not
+   re-attempt without first re-checking the finding below.
 
-   The reorder is kept because it costs nothing (identical content, identical
-   token count) and is the shape prefix caching needs. Note the reorder alone was
-   never enough: system + skills/languages/education is only 615 tokens, under the
-   1024 minimum, so the per-offer profile-item *selection* had to go too. It was
-   inert anyway — 3 profile items against `top_k: 8` meant all 3 were always sent.
-   **If the profile ever grows past `top_k` items, revisit:** reintroduce
-   selection per-profile, never per-offer, or the prefix stops being stable.
+   The premise of the item turned out to be wrong: **this provider does not do
+   prefix caching.** The prompt was reordered to system → whole profile → offer,
+   giving a 1302-token prefix byte-identical across all 248 stored offers. Verified
+   live: a byte-identical repeat cached 2690/2693 tokens, but two offers sharing
+   that prefix cached 0, even 90s apart. Scoring sends a different offer every
+   call, so an exact whole-prompt match never happens and nothing cached. See
+   "Prompt caching is not actually on" below.
+
+   Reverted in favour of the original offer-first prompt, which restores the
+   prefilter's per-offer profile-item selection. That selection had to be dropped
+   to make the prefix work — system + skills/languages/education is only 615
+   tokens, under the 1024 minimum, so the experience items had to be inside the
+   prefix — and it is the one thing the reorder actually cost. It was inert at 3
+   profile items against `top_k: 8`, but it stops being inert the moment the
+   profile grows past `top_k`, and it buys nothing to keep a prompt shaped for a
+   cache that does not exist.
+
+   **If prefix caching is ever switched on, this becomes live again** — and the
+   tradeoff is real then: a stable prefix and per-offer item selection cannot both
+   hold. Select per-profile, not per-offer.
 3. **Salary extraction + filter** — JobSpy returns min/max salary and
    `_to_raw_offer` discards it, exactly as it did `is_remote`. Same shape as work
    mode, so it follows cheaply.
@@ -46,8 +51,8 @@ Measured, 14 real scoring calls:
 | same, 90s apart to rule out population lag | ~2400 | 0 |
 
 So caching exists and is reported, but only on an exact whole-prompt match, which
-scoring never produces — it sends a different offer every call. The reorder is
-therefore correct but currently worth $0.
+scoring never produces — it sends a different offer every call. The reorder was
+therefore worth $0 and has been reverted (item 2 above).
 
 Worth trying, cheapest first:
 

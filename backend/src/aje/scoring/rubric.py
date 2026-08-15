@@ -24,13 +24,9 @@ _SYSTEM = (
 )
 
 
-def _render_profile(profile: ProfileData) -> str:
-    """Complete and deterministic, so it is identical on every call.
-
-    This block is the cacheable prefix (see `score_with_rubric`), which is why it
-    renders the whole profile rather than the prefilter's per-offer selection: a
-    selection that changes shape per offer changes the prefix and caches nothing.
-    """
+def _render_profile(profile: ProfileData, item_keys: list[str]) -> str:
+    wanted = set(item_keys)
+    selected = {key: text for key, text in profile_item_texts(profile) if key in wanted}
     sections = [
         "SKILLS: " + ", ".join(s.name for s in profile.skills),
         "LANGUAGES: "
@@ -43,8 +39,8 @@ def _render_profile(profile: ProfileData) -> str:
             " ".join(p for p in (e.degree, e.field, e.institution) if p)
             for e in profile.education
         ),
-        "EXPERIENCE AND ACHIEVEMENTS:",
-        *(text for _, text in profile_item_texts(profile)),
+        "MOST RELEVANT EXPERIENCE AND ACHIEVEMENTS:",
+        *selected.values(),
     ]
     return "\n".join(sections)
 
@@ -54,22 +50,15 @@ def _render_offer(offer: Offer) -> str:
     return f"{header}\n\n{offer.description or ''}"
 
 
-def score_with_rubric(offer: Offer, profile: ProfileData) -> RubricResult:
-    """One LLM call. Raises on failure — the caller isolates it per offer.
-
-    Ordering is load-bearing, not cosmetic. This is the highest-volume call in the
-    product and roughly three quarters of its spend, so the prompt is built stable
-    part first: system, then the whole profile, and only then the offer. Everything
-    ahead of the offer is byte-identical from one offer to the next and gets served
-    from the provider's prompt cache. The offer must stay last — moving anything
-    volatile above it pushes the shared prefix below the provider's minimum and the
-    cache silently stops paying out.
-    """
+def score_with_rubric(
+    offer: Offer, profile: ProfileData, item_keys: list[str]
+) -> RubricResult:
+    """One LLM call. Raises on failure — the caller isolates it per offer."""
     model = llm_for("scoring").with_structured_output(RubricResult)
     human = (
-        "=== CANDIDATE PROFILE ===\n"
-        f"{_render_profile(profile)}\n\n"
         "=== JOB OFFER ===\n"
-        f"{_render_offer(offer)}"
+        f"{_render_offer(offer)}\n\n"
+        "=== CANDIDATE PROFILE ===\n"
+        f"{_render_profile(profile, item_keys)}"
     )
     return model.invoke([("system", _SYSTEM), ("human", human)])

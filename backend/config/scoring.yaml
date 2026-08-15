@@ -18,10 +18,10 @@ queue:
 estimate:
   # gpt-5.6-terra rubric call: ~2.3-2.8k input + ~500-900 output, measured live.
   #
-  # NOT discounted for prompt caching, because measurement says there is none to
-  # claim. The prompt is built stable-prefix-first (see scoring/rubric.py) and that
-  # prefix is byte-identical across all 248 stored offers, but this provider only
-  # cached a byte-identical *whole* prompt (2690/2693 tokens on a repeat). Two
-  # offers sharing a 1302-token prefix cached 0, even 90s apart. Real scoring sends
-  # a different offer every call, so in practice nothing caches today.
+  # NOT discounted for prompt caching, and no prompt is shaped to earn it, because
+  # measurement says there is nothing to earn. This provider cached a byte-identical
+  # *whole* prompt (2690/2693 tokens on a repeat) but cached 0 for two offers sharing
+  # a 1302-token system+profile prefix, even 90s apart. Real scoring sends a different
+  # offer every call, so an exact whole-prompt match never happens. Revisit this only
+  # if prefix caching is switched on (TODO.md, "Prompt caching is not actually on").
   cost_per_offer_usd: 0.011

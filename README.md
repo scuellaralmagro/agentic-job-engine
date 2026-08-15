@@ -590,9 +590,9 @@ Roughly **1.1¢ per rubric call**; design estimate **$2–12/month**, scoring ab
 it. The per-run cap limits *scoring*, which is the only part that costs money —
 everything discovered is still recorded.
 
-**Prompt caching is not currently earning anything.** The rubric prompt is deliberately
-ordered stable-prefix-first, giving a 1302-token prefix that is byte-identical across
-all 248 stored offers. Verified against the live API over 14 calls:
+**Prompt caching earns nothing here, and the prompt is no longer shaped for it.** The
+rubric prompt was once reordered stable-prefix-first, giving a 1302-token prefix
+byte-identical across all 248 stored offers. Verified against the live API over 14 calls:
 
 | Case | Input | Cached |
 |---|---|---|
@@ -601,9 +601,10 @@ all 248 stored offers. Verified against the live API over 14 calls:
 | Same, 90s apart to rule out population lag | ~2400 | 0 |
 
 So this provider caches only exact whole-prompt matches, which scoring never produces —
-it sends a different offer every call. The ordering is kept because it costs nothing and
-is the shape prefix caching needs, but the cost estimate stays undiscounted. Leads for
-fixing it are in `TODO.md`.
+it sends a different offer every call. The reorder was reverted: it was worth $0, and the
+stable prefix required sending the whole profile instead of the prefilter's per-offer
+item selection. The cost estimate stays undiscounted. Leads for making caching work, and
+the tradeoff to revisit if it ever does, are in `TODO.md`.
 
 Two unexploited savings remain: making prefix caching actually work, and the Batch API
 for scheduled scoring at 50%.
