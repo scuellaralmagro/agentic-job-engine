@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from aje.db import get_session
 from aje.discovery.graph import discover_into_run
 from aje.discovery.scheduler import get_scheduler
-from aje.models import DiscoveryRun
+from aje.models import DiscoveryRun, SavedSearch
 
 logger = logging.getLogger(__name__)
 
@@ -37,6 +37,29 @@ def create_run(
     )
     session.add(run)
     session.commit()
+    return run
+
+
+def start_run_for_search(session: Session, saved: SavedSearch) -> DiscoveryRun | None:
+    """The one way a saved search starts a run.
+
+    Manual "run now" and cron both come through here, so the spend cap and the
+    concurrency guard cannot be applied to one path and forgotten on the other —
+    which is exactly how the cap went missing from the scheduled path before.
+
+    Returns None when a run is already in flight for this search. The caller
+    decides whether that is a 409 or a logged skip.
+    """
+    if active_run_for_search(session, saved.id) is not None:
+        return None
+    run = create_run(
+        session,
+        term=saved.query,
+        filters=saved.filters or {},
+        kind="scheduled",
+        saved_search_id=saved.id,
+    )
+    enqueue_run(run.id, saved.max_offers)
     return run
 
 

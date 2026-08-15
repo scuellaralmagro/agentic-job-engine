@@ -369,16 +369,14 @@ restarts. On startup, `_lifespan` syncs every `SavedSearch` cron into the schedu
 calls `reconcile_orphaned_runs` — any run still `running` was orphaned by the previous
 process exiting, and left alone would make the UI poll a job that will never finish.
 
-⚠️ **Two known defects here**, both queued in `TODO.md`:
+Every run — ad-hoc, "run now" and cron — goes through
+`jobs.py::start_run_for_search`, so the spend cap and the concurrency guard cannot apply
+to one path and not another. The API and the scheduler differ only in how they report a
+collision: a 409 for the former, a logged skip for the latter.
 
-- **The cron path and the "run now" path are different code**, despite `jobs.py`'s
-  docstring. Run-now goes `create_run` → `enqueue_run` → `execute_run`, guarded by
-  `active_run_for_search` (409 on a double-fire). Cron goes `run_saved_search_job` →
-  `run_discovery`, with no guard. They converge only at `discover_into_run`.
-- **Scheduled runs have no spend cap.** `run_saved_search` never passes `max_offers`,
-  and `None` means "score every new offer". One measured fire cost ~$0.84; nightly that
-  is ~$25/month against a $2–12/month design target. Collapsing the cron path onto
-  `create_run` + `execute_run` fixes both at once.
+That was not always true. Both defects are fixed and written up in `TODO.md`: the cron
+path used to reach `discover_into_run` via `run_saved_search` with neither a cap nor a
+guard, and `POST /searches/{id}/run` passed no cap either, so "Run now" was uncapped too.
 
 ---
 
@@ -413,8 +411,8 @@ process exiting, and left alone would make the UI poll a job that will never fin
 
 | Module | Responsibility |
 |---|---|
-| `graph.py` | The discovery StateGraph, `discover_into_run`, `run_discovery`, `run_saved_search`. |
-| `jobs.py` | Run lifecycle: `create_run`, `execute_run`, `enqueue_run`, `reconcile_orphaned_runs`, `active_run_for_search`. |
+| `graph.py` | The discovery StateGraph, `discover_into_run`, and `run_discovery` (synchronous; tests and scripts only). |
+| `jobs.py` | Run lifecycle: `start_run_for_search` (the one way a saved search runs), `create_run`, `execute_run`, `enqueue_run`, `reconcile_orphaned_runs`, `active_run_for_search`. |
 | `scheduler.py` | APScheduler wiring, cron sync per `SavedSearch`. |
 | `expand.py` | Best-effort LLM query expansion. |
 | `registry.py` | Builds source adapters from config; skips Adzuna without credentials. |
@@ -587,8 +585,12 @@ Models are chosen per task, deliberately:
 | embeddings | `text-embedding-3-small` | Only feeds the coarse prefilter. |
 
 Roughly **1.1¢ per rubric call**; design estimate **$2–12/month**, scoring about 75% of
-it. The per-run cap limits *scoring*, which is the only part that costs money —
-everything discovered is still recorded.
+it. A cap limits *scoring*, which is the only part that costs money — everything
+discovered is still recorded.
+
+Every run is capped. Ad-hoc runs take a cap from the Search tab; saved searches carry
+their own `max_offers`, default **25** (~$0.27 per run, ~$8.25/month if run daily). A
+NULL cap means deliberately uncapped, and the dialog says so in as many words.
 
 **Prompt caching earns nothing here, and the prompt is no longer shaped for it.** The
 rubric prompt was once reordered stable-prefix-first, giving a 1302-token prefix

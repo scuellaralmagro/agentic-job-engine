@@ -2,7 +2,7 @@ import pytest
 
 from aje.discovery import graph as graph_mod
 from aje.discovery.schema import RawOffer, SearchQuery
-from aje.models import DiscoveryRun, Offer, SavedSearch
+from aje.models import DiscoveryRun, Offer
 
 
 class _StubAdapter:
@@ -41,6 +41,30 @@ def _raw(
 def _no_llm_expansion(monkeypatch):
     # expansion has its own tests; keep graph tests deterministic
     monkeypatch.setattr(graph_mod, "expand_query", lambda term: [term])
+
+
+def test_run_discovery_builds_its_run_through_the_shared_constructor(
+    session, monkeypatch
+):
+    """Two places constructing a DiscoveryRun is how the manual and scheduled paths
+    drifted apart. There must be exactly one."""
+    from aje.discovery import jobs as jobs_mod
+
+    calls: list[dict] = []
+    real = jobs_mod.create_run
+
+    def spy(sess, **kwargs):
+        calls.append(kwargs)
+        return real(sess, **kwargs)
+
+    monkeypatch.setattr(jobs_mod, "create_run", spy)
+
+    adapter = _StubAdapter("stub", [_raw("Python Dev")])
+    graph_mod.run_discovery(session, term="python", adapters=[adapter], score=False)
+
+    assert len(calls) == 1
+    assert calls[0]["kind"] == "manual"
+    assert calls[0]["term"] == "python"
 
 
 def test_run_persists_offers_and_records_run(session):
@@ -187,23 +211,6 @@ def test_no_work_mode_filter_keeps_everything(session):
     assert session.query(Offer).count() == 2
 
 
-def test_run_saved_search_uses_stored_query_and_links_run(session, monkeypatch):
-    saved = SavedSearch(
-        name="Python Madrid",
-        query="python",
-        filters={"locations": ["Madrid"]},
-    )
-    session.add(saved)
-    session.commit()
-
-    adapter = _StubAdapter("stub", [_raw("Backend Dev", location="Madrid")])
-    monkeypatch.setattr(graph_mod, "build_adapters", lambda config, settings: [adapter])
-
-    run = graph_mod.run_saved_search(session, saved.id, score=False)
-
-    assert run.saved_search_id == saved.id
-    assert run.offers_new == 1
-    assert session.query(DiscoveryRun).count() == 1
 
 
 def test_run_records_a_result_for_every_offer_including_refinds(session):

@@ -15,7 +15,7 @@ from aje.discovery.normalize import to_offer
 from aje.textnorm import normalize_text
 from aje.discovery.registry import build_adapters
 from aje.discovery.schema import RawOffer, SearchQuery, SourceResult
-from aje.models import DiscoveryRun, Offer, SavedSearch
+from aje.models import DiscoveryRun, Offer
 from aje.scoring.graph import score_offers
 
 logger = logging.getLogger(__name__)
@@ -255,42 +255,30 @@ def run_discovery(
     score: bool = True,
     max_offers: int | None = None,
 ) -> DiscoveryRun:
-    """Synchronous create-then-execute. The API enqueues instead; see discovery.jobs."""
+    """Synchronous create-then-execute, kept for tests and scripts.
+
+    Production never calls this: the API and cron both go through
+    discovery.jobs.start_run_for_search, which enqueues instead of blocking.
+    """
+    # Imported here, not at module scope: jobs imports discover_into_run from this
+    # module, so a top-level import would be circular. scheduler.py does the same.
+    from aje.discovery.jobs import create_run
+
     merged = dict(filters or {})
     if location is not None:
         merged.setdefault("location", location)
     if remote is not None:
         merged.setdefault("remote", remote)
 
-    run = DiscoveryRun(
-        saved_search_id=saved_search_id,
-        kind="scheduled" if saved_search_id else "manual",
+    run = create_run(
+        session,
         term=term,
         filters=merged,
-        started_at=datetime.utcnow(),
-        status="running",
-        source_results=[],
+        kind="scheduled" if saved_search_id else "manual",
+        saved_search_id=saved_search_id,
     )
-    session.add(run)
-    session.commit()
     return discover_into_run(
         session, run, adapters=adapters, score=score, max_offers=max_offers
     )
 
 
-def run_saved_search(
-    session: Session, saved_search_id: int, *, score: bool = True
-) -> DiscoveryRun:
-    saved = session.get(SavedSearch, saved_search_id)
-    if saved is None:
-        raise ValueError(f"no saved search with id {saved_search_id}")
-    filters = saved.filters or {}
-    return run_discovery(
-        session,
-        term=saved.query,
-        location=filters.get("location"),
-        remote=filters.get("remote"),
-        filters=filters,
-        saved_search_id=saved.id,
-        score=score,
-    )

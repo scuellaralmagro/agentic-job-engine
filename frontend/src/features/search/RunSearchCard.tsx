@@ -13,7 +13,8 @@ import { Label } from "@/components/ui/label";
 import { GlassPanel } from "@/components/GlassPanel";
 import { WorkModeSelect } from "./WorkModeSelect";
 import type { WorkMode } from "@/lib/api/types";
-import { useCreateRun, useEstimate } from "./queries";
+import { useEstimate } from "@/lib/api/queries";
+import { useCreateRun } from "./queries";
 
 export function RunSearchCard() {
   const navigate = useNavigate();

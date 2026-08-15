@@ -12,6 +12,7 @@ export interface SearchInput {
   query: string;
   filters: Record<string, unknown>;
   schedule: string | null;
+  max_offers: number | null;
 }
 
 export function useSaveSearch() {

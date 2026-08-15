@@ -42,6 +42,46 @@ def test_saved_search_crud(session):
     assert client.get("/searches").json() == []
 
 
+def test_a_search_saved_without_a_cap_gets_the_default(session):
+    """The Pydantic default carries this, not the column: create_search does
+    SavedSearch(**body.model_dump()), so a None default would override the column
+    default and every new search would be born uncapped."""
+    client = _client(session)
+
+    created = client.post(
+        "/searches", json={"name": "s", "query": "python", "filters": {}}
+    )
+
+    assert created.status_code == 200
+    assert created.json()["max_offers"] == 25
+
+
+def test_an_explicit_null_cap_means_uncapped(session):
+    """Also guards the model: SQLAlchemy applies a column default whenever the value
+    is None at INSERT and cannot tell "explicitly None" from "unset", so putting
+    default=25 back on SavedSearch.max_offers would swallow this and fail here."""
+    client = _client(session)
+
+    created = client.post(
+        "/searches",
+        json={"name": "s", "query": "python", "filters": {}, "max_offers": None},
+    )
+
+    assert created.status_code == 200
+    assert created.json()["max_offers"] is None
+
+
+def test_a_zero_or_negative_cap_is_rejected(session):
+    client = _client(session)
+
+    for bad in (0, -5):
+        resp = client.post(
+            "/searches",
+            json={"name": "s", "query": "python", "filters": {}, "max_offers": bad},
+        )
+        assert resp.status_code == 422
+
+
 def test_update_missing_search_returns_404(session):
     client = _client(session)
     resp = client.put("/searches/999", json={"name": "x", "query": "y", "filters": {}})
@@ -50,7 +90,7 @@ def test_update_missing_search_returns_404(session):
 
 def test_run_search_returns_a_queued_run_record(session, monkeypatch):
     """Run-now is asynchronous now: it hands back a run to watch, not a result."""
-    from aje.api import discovery as discovery_api
+    from aje.discovery import jobs as jobs_mod
 
     saved = SavedSearch(name="s", query="python", filters={"location": "Madrid"})
     session.add(saved)
@@ -58,7 +98,7 @@ def test_run_search_returns_a_queued_run_record(session, monkeypatch):
 
     enqueued: list[int] = []
     monkeypatch.setattr(
-        discovery_api, "enqueue_run", lambda rid, cap=None: enqueued.append(rid)
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append(rid)
     )
 
     resp = _client(session).post(f"/searches/{saved.id}/run")
@@ -71,6 +111,25 @@ def test_run_search_returns_a_queued_run_record(session, monkeypatch):
     assert body["filters"] == {"location": "Madrid"}
     assert body["saved_search_id"] == saved.id
     assert enqueued == [body["id"]]
+
+
+def test_run_now_on_a_saved_search_applies_its_cap(session, monkeypatch):
+    """Run-now was uncapped too: it called enqueue_run with no cap argument."""
+    from aje.discovery import jobs as jobs_mod
+
+    saved = SavedSearch(name="s", query="python", filters={}, max_offers=25)
+    session.add(saved)
+    session.commit()
+
+    enqueued: list[tuple[int, int | None]] = []
+    monkeypatch.setattr(
+        jobs_mod, "enqueue_run", lambda rid, cap=None: enqueued.append((rid, cap))
+    )
+
+    resp = _client(session).post(f"/searches/{saved.id}/run")
+
+    assert resp.status_code == 200
+    assert enqueued == [(resp.json()["id"], 25)]
 
 
 def test_run_missing_search_returns_404(session):
@@ -170,9 +229,9 @@ def test_post_runs_rejects_a_blank_term(session):
 
 
 def test_run_now_is_asynchronous_and_refuses_a_concurrent_run(session, monkeypatch):
-    from aje.api import discovery as discovery_api
+    from aje.discovery import jobs as jobs_mod
 
-    monkeypatch.setattr(discovery_api, "enqueue_run", lambda rid, cap=None: None)
+    monkeypatch.setattr(jobs_mod, "enqueue_run", lambda rid, cap=None: None)
     saved = SavedSearch(name="s", query="python", filters={})
     session.add(saved)
     session.commit()
