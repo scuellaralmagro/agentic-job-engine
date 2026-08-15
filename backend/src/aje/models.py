@@ -90,6 +90,8 @@ class SavedSearch(Base):
     query: Mapped[str] = mapped_column(Text)
     filters: Mapped[dict] = mapped_column(JSON, default=dict)
     schedule: Mapped[str | None] = mapped_column(String(128), nullable=True)  # cron expr
+    # NULL means deliberately uncapped. See TODO.md "Scheduled runs have no spend cap".
+    max_offers: Mapped[int | None] = mapped_column(Integer, nullable=True, default=25)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
 
 

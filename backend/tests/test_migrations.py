@@ -1,6 +1,6 @@
 import subprocess
 
-from sqlalchemy import create_engine, inspect
+from sqlalchemy import create_engine, inspect, text
 
 
 def test_upgrade_head_builds_schema(tmp_path, monkeypatch):
@@ -23,3 +23,34 @@ def test_upgrade_head_builds_schema(tmp_path, monkeypatch):
     projection_cols = {c["name"] for c in inspect(engine).get_columns("cv_projections")}
     assert {"match_id", "suggestions", "language"} <= projection_cols
     assert "cover_letters" in tables
+    search_cols = {c["name"] for c in inspect(engine).get_columns("saved_searches")}
+    assert "max_offers" in search_cols
+
+
+def test_existing_saved_searches_are_backfilled_with_a_cap(tmp_path, monkeypatch):
+    """A search created before the column existed must not stay uncapped.
+
+    At migration time no NULL can be a deliberate "score everything" choice, so
+    treating them all as "never set" is the safe reading. After the migration a
+    NULL is only ever something the user chose.
+    """
+    db = tmp_path / "backfill.sqlite3"
+    monkeypatch.setenv("AJE_DATABASE_URL", f"sqlite:///{db.as_posix()}")
+    subprocess.run(
+        ["uv", "run", "alembic", "upgrade", "dae74d08d7a4"], check=True, cwd="."
+    )
+
+    engine = create_engine(f"sqlite:///{db.as_posix()}")
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                "INSERT INTO saved_searches (name, query, filters, schedule, created_at) "
+                "VALUES ('legacy', 'python', '{}', '0 8 * * *', '2026-01-01 00:00:00')"
+            )
+        )
+
+    subprocess.run(["uv", "run", "alembic", "upgrade", "head"], check=True, cwd=".")
+
+    with engine.connect() as conn:
+        cap = conn.execute(text("SELECT max_offers FROM saved_searches")).scalar()
+    assert cap == 25
