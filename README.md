@@ -647,6 +647,19 @@ for scheduled scoring at 50%.
 
 ## Running it
 
+```powershell
+.\dev.ps1
+```
+
+Starts both servers in one window with per-service prefixes, and stops both on Ctrl+C.
+It runs `uv sync` / `npm install` when those are missing and applies migrations, so it
+works on a fresh clone. `-SkipSetup` skips those checks; `-BackendPort` / `-FrontendPort`
+override the defaults (8000 / 5173).
+
+You still need `uv run playwright install chromium` once, for PDF rendering.
+
+To run them by hand instead:
+
 ```bash
 # backend — from backend/, NOT the repo root
 uv sync
@@ -664,6 +677,18 @@ root creates an empty `data/aje.sqlite3` there and the app dies with
 `no such table: saved_searches`.
 
 ⚠️ **Do not use `--reload`.** Restart uvicorn to pick up code changes.
+
+⚠️ **Kill the process *tree*.** `uv run` and `npm run` are launchers — killing the parent
+orphans uvicorn or node, which keeps holding the port. `dev.ps1` uses `taskkill /T` for
+this reason; by hand, free a stuck port with:
+
+```powershell
+Get-NetTCPConnection -LocalPort 8000 -State Listen | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force }
+```
+
+⚠️ **`dev.ps1` is deliberately pure ASCII.** PowerShell 5.1 reads a `.ps1` with no BOM in
+the system ANSI codepage, so a stray em-dash becomes three garbage bytes and the script
+fails to parse. Keep it ASCII rather than relying on a BOM an editor may strip.
 
 ---
 
