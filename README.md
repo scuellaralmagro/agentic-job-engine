@@ -176,10 +176,18 @@ data.**
 The coarse filter **keeps offers whose work mode is unknown.** Roughly half of real
 postings never state it, so dropping them would silently hide half the queue.
 
-**Deduplication** is by `content_hash` = SHA-256 of normalized `title|company|location`.
-⚠️ Known defect: the raw location goes into the hash, so the same job on Indeed
-(`Madrid, MD, ES`) and Tecnoempleo (`Madrid`) is stored *and scored* twice. Queued as
-TODO item 4.
+**Deduplication** is by `content_hash` = SHA-256 of `title|company|`
+`canonical_location(location)`. Title and company are accent-stripped and lowercased;
+location goes through `discovery/location.py`, which reduces Indeed's
+`City, REGION, COUNTRY` and Tecnoempleo's bare `City` to the same key and collapses every
+spelling of remote (`100% remoto`, `En remoto, ES`) to one token.
+
+**Location stays in the key on purpose.** Dropping it is the obvious way to make
+cross-source duplicates disappear, and it is wrong: in the live data, five of the seven
+title+company collisions are real openings in *different* cities — MAP advertises the
+same consultant role in Madrid, Málaga and Barcelona. Removing location would collapse
+those into one row and silently hide two jobs.
+`test_hash_keeps_different_cities_apart` guards it.
 
 ### 3. Scoring — Offers → Matches
 
@@ -418,6 +426,7 @@ guard, and `POST /searches/{id}/run` passed no cap either, so "Run now" was unca
 | `registry.py` | Builds source adapters from config; skips Adzuna without credentials. |
 | `adzuna.py` · `jobspy_source.py` · `tecnoempleo.py` | Source adapters. |
 | `normalize.py` | `RawOffer` → `Offer`, `compute_offer_hash`. |
+| `location.py` | `canonical_location` — one city key across the boards' formats. |
 | `work_mode.py` | Deterministic remote/hybrid/on-site detection. |
 | `results.py` | Per-offer `DiscoveryResult` status tracking. |
 | `estimate.py` | Pre-run spend ceiling (a maximum, not a forecast). |
