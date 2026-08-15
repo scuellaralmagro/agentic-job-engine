@@ -28,13 +28,16 @@ In order. Work mode is done; the rest are next.
    **If prefix caching is ever switched on, this becomes live again** — and the
    tradeoff is real then: a stable prefix and per-offer item selection cannot both
    hold. Select per-profile, not per-offer.
-3. **Salary extraction + filter** — JobSpy returns min/max salary and
+3. ~~Scheduled-run spend cap~~ — done 2026-08-15. Promoted ahead of salary because
+   it was a measured ~$25/month leak while item 2 turned out to be worth $0. See
+   "Scheduled runs have no spend cap" below for what it closed.
+4. **Salary extraction + filter** ← **next.** JobSpy returns min/max salary and
    `_to_raw_offer` discards it, exactly as it did `is_remote`. Same shape as work
    mode, so it follows cheaply.
-4. **Fix cross-source dedup** — `compute_offer_hash` uses the raw location, so the
+5. **Fix cross-source dedup** — `compute_offer_hash` uses the raw location, so the
    same job on Indeed ("Madrid, MD, ES") and Tecnoempleo ("Madrid") is stored and
    scored twice. Normalizing location into the hash cuts duplicate spend.
-5. **Application tracking** — the queue stops at `accepted`; there is no applied
+6. **Application tracking** — the queue stops at `accepted`; there is no applied
    date, response or interview state. The CV and cover letter already hang off the
    match, so this is where they belong.
 
@@ -105,40 +108,36 @@ What the study has to answer before any of that is worth doing:
 Re-run the caching A/B (see above) against any candidate before believing a claim on its
 pricing page.
 
-## Scheduled runs have no spend cap
+## ~~Scheduled runs have no spend cap~~ — fixed 2026-08-15
 
-**Found:** 2026-08-04, verifying the scheduled discovery path for the first time.
+**Found:** 2026-08-04. **Fixed:** 2026-08-15, together with the path divergence below.
 
-`run_saved_search` calls `run_discovery` without `max_offers`, and `discover_into_run`
-reads `None` as "score every new offer". The per-run cap in the Search tab — the only
-spend control in the product — applies to ad-hoc runs and is unreachable from a
-scheduled one. There is no cap column on `SavedSearch`, so the UI cannot set one.
+`SavedSearch.max_offers` now caps scoring on every path. NULL means deliberately
+uncapped; rows predating the column were backfilled to 25. The measurement that
+motivated it: one fire of "AI Engineer" discovered 91 offers, 76 new, and scored all 76
+uncapped — ~$0.84 for a single run, ~$25/month nightly against a $2–12/month design
+estimate for the whole product.
 
-Measured: one fire of a saved search on "AI Engineer" discovered 91 offers, 76 of them
-new, and scored all 76 uncapped. At `scoring.yaml → estimate.cost_per_offer_usd` of
-~1.1¢ that is ~$0.84 for a single run. Nightly, that one search is ~$25/month against
-a design estimate of $2–12/month total.
+**Two uncapped paths, not one.** The cron path was the one recorded here. The second was
+found while designing the fix: `POST /searches/{id}/run` called `enqueue_run(run.id)`
+with no cap argument, so "Run now" on a saved search had always been uncapped too.
 
-Needs a `max_offers` column on `SavedSearch`, a field in the saved-search UI, and
-`run_saved_search` passing it through. Consider a sensible default rather than `None`,
-so a search saved before the column exists cannot spend without limit.
+The paths no longer diverge. `jobs.py::start_run_for_search` applies the concurrency
+guard, creates the run and enqueues it with the cap; the API and cron differ only in
+whether a collision is a 409 or a logged skip, so `jobs.py`'s "manual and scheduled runs
+travel one code path" docstring is finally true. `run_saved_search` is deleted and
+`run_discovery` builds its run through `create_run`, leaving one constructor. Adopting
+the guard on the cron path also stops a nightly run slower than its own interval from
+overlapping itself and double-spending.
 
-## The cron path and the "run now" path are different code
+Two traps worth remembering:
 
-**Found:** 2026-08-04, same investigation.
-
-`jobs.py` opens with "manual and scheduled runs travel one code path". They do not:
-
-- **Run now** (`api/discovery.py::run_search`) → `create_run` + `enqueue_run` →
-  `execute_run` → `discover_into_run`, guarded by `active_run_for_search` (409)
-- **Cron** (`discovery/scheduler.py::run_saved_search_job`) → `run_saved_search` →
-  `run_discovery` → `discover_into_run`, with no guard
-
-They converge at `discover_into_run`, so results are recorded identically and the
-scheduled path is verified working. But the cron path skips the active-run check, and
-the divergence is where the missing spend cap comes from. Collapsing
-`run_saved_search_job` onto `create_run` + `execute_run` would fix both at once and make
-the docstring true.
+- **No `default=` on the column.** SQLAlchemy applies a column default whenever the
+  value is None at INSERT and cannot tell "explicitly None" from "unset", so a default
+  there swallows an explicit NULL and makes "uncapped" unexpressible. The 25 lives on
+  `SavedSearchIn`, the only layer where omitted and null differ.
+- **The dialog always sends the field**, so the API's omitted-field default never fires
+  from the UI. The dialog pre-fills 25 itself.
 
 ## Queue source filter
 
