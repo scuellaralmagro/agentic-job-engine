@@ -1,18 +1,39 @@
 # Agentic Job Engine
 
-A local-first job search engine. It ingests your CV and LinkedIn export into a single
-structured **Profile**, discovers offers across several job boards, scores each one
-against you with an LLM rubric, and drafts a tailored CV and cover letter for the ones
-worth applying to.
+**A local-first job-search engine built on one idea: a language model should not be
+*asked* not to fabricate your experience — it should be structurally *unable* to.**
 
-It runs entirely on your machine against a SQLite database. Nothing is uploaded
-anywhere except the LLM calls it makes on your behalf.
+It ingests your CV and LinkedIn export into a single structured **Profile**, discovers
+offers across several job boards, scores each one against you with an LLM rubric, and
+drafts a tailored CV and cover letter for the ones worth applying to.
+
+The interesting part is not the job search. It is what happens when a model writes a
+document about you that a stranger will read: every line of a generated CV must cite a
+`source_key` pointing at a real Profile item, and a pure, deterministic validator
+rejects any draft citing a key that does not exist. The model cannot invent a job you
+never had, because there is no key for it to cite.
+
+It runs entirely on your machine against a SQLite database. Nothing is uploaded anywhere
+except the LLM calls it makes on your behalf.
+
+### What it does not do
+
+- **It does not apply to anything.** There is no submission path in the codebase. The
+  pipeline ends at a drafted CV and cover letter, which land in a review queue you work
+  by hand (`new` → `accepted` / `dismissed`). Every application is sent by a human who
+  read it first.
+- **It does not write free prose about your experience.** Anchoring (below) makes
+  unsupported claims a validation error, not a matter of prompt discipline.
+- **It does not mass-produce applications.** Scoring is the only part that costs money
+  and every run is capped — the default saved-search cap is 25 offers. The design target
+  is a considered shortlist, not volume.
 
 ---
 
 ## Table of contents
 
 - [The idea](#the-idea)
+  - [What it does not do](#what-it-does-not-do)
 - [Architecture](#architecture)
 - [The four pipelines](#the-four-pipelines)
   - [1. Extraction](#1-extraction--documents--profile)
@@ -26,6 +47,7 @@ anywhere except the LLM calls it makes on your behalf.
 - [Frontend](#frontend)
 - [Configuration](#configuration)
 - [Cost model](#cost-model)
+- [Legal posture](#legal-posture)
 - [Running it](#running-it)
 - [Testing](#testing)
 - [Conventions and gotchas](#conventions-and-gotchas)
@@ -36,15 +58,16 @@ anywhere except the LLM calls it makes on your behalf.
 
 Three ideas carry the whole design.
 
-**One Profile is the source of truth.** Every CV or LinkedIn export you upload is
-merged into a single structured Profile. Nothing downstream reads your documents — they
-read the Profile. That means a tailored CV can be checked against it mechanically.
-
 **Anchoring instead of trust.** When the model drafts a tailored CV, it does not write
 prose freely. It emits `source_key` references — `experience:acme|backend engineer`,
 `skill:python` — pointing at Profile items. A pure, deterministic validator rejects any
 draft referencing a key the Profile does not contain. A model cannot invent a job you
-never had, because it has no key to cite for it.
+never had, because it has no key to cite for it. Validation is a function of LLM output
+alone: no DB, no network, no model in the loop deciding whether the model behaved.
+
+**One Profile is the source of truth.** Every CV or LinkedIn export you upload is
+merged into a single structured Profile. Nothing downstream reads your documents — they
+read the Profile. That is what makes the check above mechanical rather than editorial.
 
 **Spend is a first-class constraint.** LLM scoring is the product's core claim and also
 its main cost. A cheap embedding prefilter gates the expensive rubric call, runs carry
@@ -161,7 +184,7 @@ Sources (`discovery/registry.py`):
 | Source | Kind | Note |
 |---|---|---|
 | **Adzuna** | Official API | Preferred on legal grounds. Skipped with a warning if `AJE_ADZUNA_APP_ID` / `AJE_ADZUNA_APP_KEY` are unset. |
-| **JobSpy** | Library scraper | **One adapter per site** — currently LinkedIn and Indeed. |
+| **JobSpy** | Library scraper | **One adapter per site** — currently LinkedIn and Indeed. See [Legal posture](#legal-posture). |
 | **Tecnoempleo** | HTML scraper | Spanish market; throttled by `delay_seconds`. |
 
 **JobSpy is split into one adapter per site, and that is load-bearing.** A single
@@ -642,6 +665,39 @@ the tradeoff to revisit if it ever does, are in `TODO.md`.
 
 Two unexploited savings remain: making prefix caching actually work, and the Batch API
 for scheduled scoring at 50%.
+
+---
+
+## Legal posture
+
+This is a single-user tool that reads public job listings on its operator's behalf. That
+is a narrower activity than "scraping", and the design keeps it narrow deliberately.
+
+**Official APIs are preferred.** Adzuna is an official, credentialed API and is the
+first-class source. The scraper adapters exist because no equivalent API covers the
+Spanish market, not because scraping is the preferred route.
+
+**What the collectors do not do:**
+
+| | |
+|---|---|
+| No proxy rotation | Requests originate from one machine, one IP — the operator's. |
+| No credentialed access | Nothing logs in. Only listings served to an anonymous visitor are read. |
+| No CAPTCHA or bot-wall circumvention | If a board refuses, the adapter records the error and the run degrades to `partial`. |
+| No redistribution | Offers live in a local SQLite database, scored against one Profile. Nothing is republished, resold, or shared. |
+| No volume | `max_results` caps every site per run; Tecnoempleo additionally sleeps `delay_seconds` between requests. A run reads roughly what a person browsing the same board would. |
+
+**Per-site adapters are individually removable.** Each board is its own adapter in
+`discovery/registry.py` with its own `SourceResult` and error isolation. Dropping one is
+a registry edit, not a refactor — so an operator whose jurisdiction or employer takes a
+stricter view of a given board's terms can remove it without touching the pipeline.
+
+**If you run this yourself:** the terms of service of each board are yours to read, and
+they differ by site and by jurisdiction. LinkedIn's in particular prohibit automated
+access, and enforcement is a real risk borne by the operator. Adzuna alone is sufficient
+to run the whole pipeline end to end.
+
+This is a description of the design's intent, not legal advice.
 
 ---
 
